@@ -83,7 +83,7 @@ def prepare(path=DATA):
 def select(df, years, genre="Tous les genres"):
     out = df[df["year"].between(*years)].copy()
     if genre != "Tous les genres":
-        out = out[out["genres"].apply(lambda values: genre in values)]
+        out = out.loc[out["genres"].apply(lambda values: genre in values).astype(bool)]
     return out
 
 

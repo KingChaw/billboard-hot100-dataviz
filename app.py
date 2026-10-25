@@ -370,7 +370,8 @@ elif route == "map":
     # Le choix d’un pays est aussi appliqué à la sélection contextuelle des titres.
     if country != "Tous":
         source = data[data.pays.eq(country)].source.iloc[0]
-        title_frames = {p: d[d.origins.map(lambda values: source in values)] for p, d in frames.items()}
+        title_frames = {p: d.loc[d.origins.map(lambda values: source in values).astype(bool)]
+                        for p, d in frames.items()}
     with detail_block(notes=[ORIGIN_NOTE, "Un pays documenté mais absent de la sélection vaut zéro. Gris : pays non documenté ou aucune origine exploitable.",
                              "« Unites States » est normalisé en United States. « Columbia » est normalisé en Colombia sur le titre We Don't Talk About Bruno : correction étayée par les biographies Disney du casting, sans vérification exhaustive de chaque origine du casting.",
                              "Carte : localiser ; barres à base commune : comparer. Les petites îles restent accessibles par repère et sélecteur."]):

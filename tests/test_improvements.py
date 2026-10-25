@@ -59,6 +59,12 @@ class Corrections(unittest.TestCase):
         self.assertEqual(b.foreign_language.sum(),4)
         self.assertTrue(b.cdr_genre.isna().all())
 
+    def test_empty_period_keeps_columns_after_genre_filter(self):
+        empty = select(self.df, (2026, 2026), 'Pop')
+        self.assertTrue(empty.empty)
+        self.assertIn('date', empty.columns)
+        self.assertEqual(empty.columns.tolist(), self.df.columns.tolist())
+
     def test_missing_zero_and_denominator(self):
         d = pd.DataFrame({'sample':[1, 0, float('nan')]})
         shares = binary_shares(d,['sample'],{'sample':'Sample'}).iloc[0]
@@ -179,6 +185,7 @@ class NewJourneys(unittest.TestCase):
         self.app.radio(key='mode').set_value('Intervalles d’années').run()
         self.app.slider(key='years_b').set_value((1958,1959)).run()
         self.app.selectbox(key='genre').set_value('Non renseigné').run()
+        self.assertFalse(self.app.exception, [e.message for e in self.app.exception])
         self.app.slider(key='years_a').set_value((2020,2024)).run()
         for route in ROUTES:
             self.go(route)
