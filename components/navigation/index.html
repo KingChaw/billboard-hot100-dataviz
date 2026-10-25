@@ -1,0 +1,15 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"></head><body style="margin:0"><script>
+const send = (type, data={}) => parent.postMessage({isStreamlitMessage:true,type,...data}, '*');
+let previous;
+window.addEventListener('message', e => {
+ if(e.data.type !== 'streamlit:render') return;
+ const key = JSON.stringify([e.data.args.route, e.data.args.token]);
+ if (key !== previous) {
+  try { parent.document.querySelector('[data-testid="stMain"]')?.scrollTo({top:0,behavior:'instant'}); } catch (_) {}
+  previous = key;
+ }
+ send('streamlit:setFrameHeight',{height:0});
+});
+send('streamlit:componentReady',{apiVersion:1});
+send('streamlit:setFrameHeight',{height:0});
+</script></body></html>

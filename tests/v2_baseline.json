@@ -1,0 +1,228 @@
+{
+  "hashes": {
+    "analysis.py": "ac2c3ad8d8acd382f76287364acf6bd1c0eba4ada21eb3fb0061df6852952545",
+    "data/billboard.csv": "7be9a67e7288f7d6263515a3a1f2af76dba4b209349569fecc054ffa27bd1780",
+    "data/topics.csv": "4778fdb0492d439865c979caf25dda03e7715f891d4b4ae09a02de33708a02f2",
+    "PROPOSITION.md": "64accad4f06ef7cb5c5c0f5a527ca89bab697ad8ef0c5210baf7aa23fef227ba"
+  },
+  "periods": {
+    "A": {
+      "n": 226,
+      "medians": {
+        "length_sec": 161.5,
+        "intro_length_sec": 9.0,
+        "bpm": 117.0,
+        "energy": 54.0,
+        "danceability": 55.0,
+        "acousticness": 60.0,
+        "loudness_d_b": -10.0,
+        "front_person_age": 23.5,
+        "writers_all": 2.0,
+        "writers_original": 2.0,
+        "producer_count": 1.0
+      },
+      "valid": {
+        "length_sec": 226,
+        "intro_length_sec": 226,
+        "bpm": 226,
+        "energy": 226,
+        "danceability": 226,
+        "acousticness": 226,
+        "loudness_d_b": 226,
+        "front_person_age": 220,
+        "writers_all": 224,
+        "writers_original": 224,
+        "producer_count": 222
+      },
+      "origins": {
+        "États-Unis uniquement (dont Porto Rico)": 180,
+        "Hors États-Unis uniquement": 46
+      },
+      "formats": {
+        "Groupe": 121,
+        "Solo": 92,
+        "Duo": 13
+      },
+      "genres": [
+        {
+          "catégorie": "Rock",
+          "effectif": 141,
+          "part": 62.389380530973455
+        },
+        {
+          "catégorie": "Pop",
+          "effectif": 95,
+          "part": 42.0353982300885
+        },
+        {
+          "catégorie": "Funk/Soul",
+          "effectif": 51,
+          "part": 22.56637168141593
+        },
+        {
+          "catégorie": "Folk, World, & Country",
+          "effectif": 19,
+          "part": 8.4070796460177
+        },
+        {
+          "catégorie": "Stage & Screen",
+          "effectif": 10,
+          "part": 4.424778761061947
+        },
+        {
+          "catégorie": "Jazz",
+          "effectif": 6,
+          "part": 2.6548672566371683
+        },
+        {
+          "catégorie": "Blues",
+          "effectif": 6,
+          "part": 2.6548672566371683
+        },
+        {
+          "catégorie": "Children's",
+          "effectif": 1,
+          "part": 0.4424778761061947
+        }
+      ],
+      "binary": [
+        {
+          "catégorie": "foreign_language",
+          "effectif": 3,
+          "part": 1.3274336283185841,
+          "renseignés": 226
+        },
+        {
+          "catégorie": "sample",
+          "effectif": 0,
+          "part": 0.0,
+          "renseignés": 226
+        },
+        {
+          "catégorie": "interpolation",
+          "effectif": 19,
+          "part": 8.4070796460177,
+          "renseignés": 226
+        },
+        {
+          "catégorie": "cover",
+          "effectif": 59,
+          "part": 26.106194690265486,
+          "renseignés": 226
+        }
+      ]
+    },
+    "B": {
+      "n": 81,
+      "medians": {
+        "length_sec": 200.0,
+        "intro_length_sec": 11.0,
+        "bpm": 118.0,
+        "energy": 65.0,
+        "danceability": 68.0,
+        "acousticness": 12.0,
+        "loudness_d_b": -6.0,
+        "front_person_age": 30.0,
+        "writers_all": 5.0,
+        "writers_original": 5.0,
+        "producer_count": 2.0
+      },
+      "valid": {
+        "length_sec": 81,
+        "intro_length_sec": 81,
+        "bpm": 81,
+        "energy": 81,
+        "danceability": 81,
+        "acousticness": 81,
+        "loudness_d_b": 81,
+        "front_person_age": 81,
+        "writers_all": 81,
+        "writers_original": 81,
+        "producer_count": 81
+      },
+      "origins": {
+        "États-Unis uniquement (dont Porto Rico)": 49,
+        "Hors États-Unis uniquement": 19,
+        "Mixte États-Unis / autres": 13
+      },
+      "formats": {
+        "Solo": 60,
+        "Duo": 11,
+        "Groupe": 10
+      },
+      "genres": [
+        {
+          "catégorie": "Pop",
+          "effectif": 36,
+          "part": 44.44444444444444
+        },
+        {
+          "catégorie": "Hip Hop",
+          "effectif": 22,
+          "part": 27.160493827160494
+        },
+        {
+          "catégorie": "Non renseigné",
+          "effectif": 16,
+          "part": 19.753086419753085
+        },
+        {
+          "catégorie": "Electronic",
+          "effectif": 10,
+          "part": 12.345679012345679
+        },
+        {
+          "catégorie": "Rock",
+          "effectif": 8,
+          "part": 9.876543209876543
+        },
+        {
+          "catégorie": "Folk, World, & Country",
+          "effectif": 8,
+          "part": 9.876543209876543
+        },
+        {
+          "catégorie": "Funk/Soul",
+          "effectif": 5,
+          "part": 6.172839506172839
+        },
+        {
+          "catégorie": "Reggae",
+          "effectif": 1,
+          "part": 1.2345679012345678
+        },
+        {
+          "catégorie": "Stage & Screen",
+          "effectif": 1,
+          "part": 1.2345679012345678
+        }
+      ],
+      "binary": [
+        {
+          "catégorie": "foreign_language",
+          "effectif": 4,
+          "part": 4.938271604938271,
+          "renseignés": 81
+        },
+        {
+          "catégorie": "sample",
+          "effectif": 16,
+          "part": 19.753086419753085,
+          "renseignés": 81
+        },
+        {
+          "catégorie": "interpolation",
+          "effectif": 11,
+          "part": 13.580246913580247,
+          "renseignés": 81
+        },
+        {
+          "catégorie": "cover",
+          "effectif": 0,
+          "part": 0.0,
+          "renseignés": 81
+        }
+      ]
+    }
+  }
+}

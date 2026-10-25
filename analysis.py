@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from collaboration_rules import qualify_credits
+
 
 DATA = Path(__file__).resolve().parent / "data" / "billboard.csv"
 GENRE_LABELS = {"Funk / Soul": "Funk/Soul", "Funk /Soul": "Funk/Soul"}
@@ -68,11 +70,7 @@ def prepare(path=DATA):
     rounded = df["artist_structure"].apply(lambda x: x - 0.5 if pd.notna(x) and x % 1 == 0.5 else x)
     df["artist_format"] = rounded.map(FORMATS).fillna("Non renseigné")
     df["listed_guest"] = df["artist_structure"].apply(lambda x: pd.NA if pd.isna(x) else bool(x % 1 == 0.5)).astype("boolean")
-    # Présence d'un autre interprète identifiable dans la chaîne artist ;
-    # approximation à examiner ligne par ligne, sans prétendre mesurer les featurings commerciaux.
-    df["collaboration_credit"] = df["artist"].fillna("").str.contains(
-        r"\bft\.?\b|\bfeat\.?\b|\bfeaturing\b|\s&\s|\s\+\s|\s,\s.*\s(?:and|&)\s",
-        case=False, regex=True)
+    df = df.join(qualify_credits(df))
     for source, target in [
         ("songwriters", "writers_all"),
         ("songwriters_w_o_interpolation_sample_credits", "writers_original"),
@@ -102,7 +100,7 @@ def binary_shares(df, columns, labels):
     n = len(df)
     return pd.DataFrame([
         {"catégorie": labels[col], "effectif": int(df[col].eq(1).sum()),
-         "part": 100 * df[col].eq(1).sum() / n if n else 0,
+         "part": 100 * df[col].eq(1).sum() / n if n and df[col].notna().any() else float("nan"),
          "renseignés": int(df[col].notna().sum())}
         for col in columns
     ])

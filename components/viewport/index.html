@@ -1,0 +1,39 @@
+<!doctype html><html lang="fr"><head><meta charset="utf-8"></head><body style="margin:0">
+<script>
+// Petit composant Streamlit local : mesure l'espace réel au-dessus du graphique.
+const send = (type, data = {}) => parent.postMessage({isStreamlitMessage: true, type, ...data}, '*');
+let previous = '', timer;
+function measure() {
+  let height = 460, width = 1200;
+  try {
+    width = parent.innerWidth;
+    const frame = window.frameElement;
+    const top = frame.getBoundingClientRect().bottom + (frame.closest('[data-testid="stMain"]')?.scrollTop || 0);
+    height = width < 768 ? 430 : Math.max(280, Math.min(780, parent.innerHeight - top - 100));
+  } catch (_) { /* Le défaut reste lisible si l'intégration isole les origines. */ }
+  const value = {height: Math.round(height), width};
+  if (JSON.stringify(value) !== previous) {
+    previous = JSON.stringify(value);
+    send('streamlit:setComponentValue', {value, dataType: 'json'});
+  }
+}
+window.addEventListener('message', e => {
+  if (e.data.type === 'streamlit:render') {
+    send('streamlit:setFrameHeight', {height: 0});
+    clearTimeout(timer); timer = setTimeout(measure, 120);
+  }
+});
+try {
+  const schedule = () => {clearTimeout(timer); timer = setTimeout(measure, 150);};
+  parent.addEventListener('resize', schedule);
+  // Les contrôles peuvent ajouter une ligne (pays sélectionné, titre replié, etc.).
+  const observer = new MutationObserver(schedule);
+  observer.observe(parent.document.querySelector('[data-testid="stMain"]'), {childList: true, subtree: true});
+  window.addEventListener('pagehide', () => {
+    parent.removeEventListener('resize', schedule);
+    observer.disconnect();
+  });
+} catch (_) {}
+send('streamlit:componentReady', {apiVersion: 1});
+send('streamlit:setFrameHeight', {height: 0});
+</script></body></html>
