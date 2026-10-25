@@ -1,4 +1,5 @@
 """Billboard n°1 — python -m streamlit run app.py."""
+from html import escape
 from pathlib import Path
 
 import pandas as pd
@@ -7,12 +8,13 @@ import streamlit.components.v1 as components
 
 from analysis import DATA, prepare, select
 from charts import bars, binary_frame, distribution, points, render, share_frame, stacked, trend, world_map
-from dashboard_data import (METRICS, ORIGINS, ORIGIN_HELP, CREDITS, REUSE, collaboration_frame,
+from dashboard_data import (AXES, METRICS, ORIGINS, ORIGIN_HELP, CREDITS, REUSE, 
                             country_frame, decades, overlap_message, ranked_categories, comparison_rows)
 from periods import date_label, period_labels, display_comparison
 from theme import apply_theme
-from ui import (category_legend, category_message, coverage_note, details, header, kpi_cards, median_card, metric_message,
-                number, numeric_summary, numeric_table, selection_table, share_card, shares_summary, show_table, title_explorer)
+from ui import (TABLE_LABELS as TABLE_COLUMNS, category_legend, category_message, coverage_note, details, kpi_cards, median_card,
+                metric_message, number, numeric_summary, numeric_table, selection_table, share_card,
+                shares_summary, simple_comparison, short_median_card, short_share_card, show_table)
 
 st.set_page_config(page_title="Billboard #1", page_icon="🎵", layout="wide", initial_sidebar_state="expanded")
 apply_theme()
@@ -54,21 +56,21 @@ NAV = {
                          ("central", "Rôle central"), ("presence", "Présence de sections"), ("genres", "Genres")],
     "Origines des artistes": [("origin_trend", "Évolution des origines"), ("origins", "Composition des origines"),
                                  ("map", "Pays et territoires")],
-    "Profils et création": [("ages", "Âges renseignés"), ("formats", "Groupe, duo ou solo"),
-                               ("collabs", "Collaborations"), ("teams", "Équipes de création"),
-                               ("reuse", "Réutilisation musicale")],
+    "Profils et création": [("ages", "Âge"), ("formats", "Seul ou à plusieurs"), ("teams", "Équipes"),
+                               ("reuse", "Samples et reprises")],
     "Données": [("data_a", "Titres de la période étudiée"), ("data_b", "Titres de la période de référence")],
 }
 TITLES = {route: label for entries in NAV.values() for route, label in entries}
 TITLES.update(summary="Quels repères offrent les titres n°1 ?", format_trend="Comment les caractéristiques musicales évoluent-elles ?",
               origin_trend="Comment les origines associées aux n°1 évoluent-elles ?",
               duration="Comment la durée des titres varie-t-elle ?", intro="Comment la durée des introductions varie-t-elle ?",
-              sound="Comment le profil sonore varie-t-il ?", ages="Quels âges sont renseignés pour les artistes ?",
-              teams="Les équipes de création se sont-elles agrandies ?", reuse="Comment les pratiques de réutilisation évoluent-elles ?",
-              collabs="Quelles associations d’artistes apparaissent au crédit ?",
+              sound="Comment le profil sonore varie-t-il ?", ages="À quel âge les artistes décrochent-ils un n°1 ?",
+              teams="Combien de personnes faut-il pour écrire et produire un n°1 ?",
+              reuse="Les n°1 s’appuient-ils davantage sur des morceaux existants ?",
               central="Quels instruments structurent les titres n°1 ?", presence="Quelles sections instrumentales sont présentes ?",
               genres="Quels genres sont associés aux titres n°1 ?", origins="Comment se répartissent les origines ?",
-              formats="Comment se répartissent les formats d’artistes ?", map="Quels pays et territoires sont associés aux n°1 ?")
+              formats="Seul ou à plusieurs : comment se fait un n°1 ?",
+ map="Quels pays et territoires sont associés aux n°1 ?")
 
 
 def navigate(route):
@@ -100,6 +102,14 @@ def navigation(labels):
                       type="primary" if st.session_state.route == route else "tertiary")
 
 
+def journey(title, steps):
+    """Parcours d'un onglet en frise : étapes numérotées reliées dans l'ordre de lecture."""
+    html = f'<div class="journey"><div class="journey-title">{escape(title)}</div><ol>'
+    for name, question in steps:
+        html += f'<li><b>{escape(name)}</b><span>{escape(question)}</span></li>'
+    st.markdown(html + '</ol></div>', unsafe_allow_html=True)
+
+
 def shortcut(label, route):
     st.button(label, key=f"shortcut_{route}", on_click=navigate, args=(route,), width="stretch")
 
@@ -115,7 +125,9 @@ def period_label(option):
     return date_label((a, b))
 
 
-st.markdown('<div class="brand-banner"><span class="brand">Billboard <b>#1</b></span></div>', unsafe_allow_html=True)
+st.markdown('<div class="brand-banner"><span class="eq"><i></i><i></i><i></i><i></i><i></i></span>'
+            '<span class="brand">Billboard <b>#1</b></span>'
+            '<span class="brand-sub">Les n°1 du Hot 100 · repères pour un label indépendant</span></div>', unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown('<div class="filter-heading">Filtres</div>', unsafe_allow_html=True)
@@ -130,6 +142,8 @@ with st.sidebar:
     else:
         years_a = st.slider("Période étudiée", first, last, key="years_a")
         years_b = st.slider("Période de référence", first, last, key="years_b")
+    # Effectifs remplis plus bas, une fois les périodes filtrées : visibles sur toutes les pages.
+    counts_slot = st.empty()
     overlap = overlap_message(years_a, years_b)
     if overlap:
         st.warning(overlap)
@@ -154,7 +168,9 @@ TITLES.update(data_a=f"Titres · {labels['Période A']}", data_b=f"Titres · {la
 navigation(labels)
 route = st.session_state.route
 position(route=route, token=st.session_state.scroll_token, key="page_position")
-header(years_a, years_b, frames, genre)
+counts_slot.markdown('<div class="period-counts">' + "".join(
+    f'<div class="count-{suffix}"><span class="period-{suffix}">{labels[p]}</span><b>{len(d)}</b> titres</div>'
+    for (p, d), suffix in zip(frames.items(), "ab")) + '</div>', unsafe_allow_html=True)
 st.title(TITLES[route])
 for label, data in frames.items():
     if data.empty:
@@ -174,14 +190,65 @@ PRESENT = {"orchestral_strings": "Cordes présentes", "horns_winds": "Cuivres/ve
 BOX_NOTE = "La médiane partage les valeurs en deux moitiés. Q1–Q3 contient la moitié centrale des valeurs ; ce n’est pas un intervalle de confiance."
 TREND_NOTE = "Courbe : périodes indiquées sur l’axe. Cartes de comparaison : vos intervalles exacts, parfois différents des décennies. Même filtre de genre."
 filtered = select(all_data, (first, last), genre)
-title_metric = None
-title_frames = frames
-# Colonnes source des explorations contextuelles, fixées dans chaque branche.
-title_columns = ["discogs_genre", "length_sec", "intro_length_sec"]
 
 
-def detail_block(columns=None, notes=()):
-    return details(frames, all_data, genre, columns, notes)
+# Colonnes de data/billboard.csv utilisées par chaque vue, rappelées en tête de Détails.
+SOURCES = {
+    "duration": ["length_sec"], "intro": ["intro_length_sec"],
+    "central": ["guitar_based", "piano_keyboard_based", "vocally_based", "bass_based"],
+    "presence": ["orchestral_strings", "horns_winds"], "genres": ["discogs_genre"],
+    "origin_trend": ["artist_place_of_origin"], "origins": ["artist_place_of_origin", "foreign_language"],
+    "map": ["artist_place_of_origin"], "ages": ["front_person_age", "discogs_genre"],
+    "formats": ["artist", "artist_structure"], "reuse": ["sample", "interpolation", "cover"],
+}
+
+
+def sources(route):
+    if route == "sound":
+        return [st.session_state.get("sonic", "bpm")]
+    if route == "teams":
+        return ["producers" if st.session_state.get("team_role") == "Producteurs" else "songwriters_w_o_interpolation_sample_credits"]
+    if route == "format_trend":
+        return [st.session_state.get("evolution_metric", "length_sec")]
+    return SOURCES.get(route, [])
+
+
+@st.cache_data
+def raw_data(source_version):
+    return pd.read_csv(DATA)
+
+
+def field_values(column):
+    """Valeurs possibles d'une colonne source, décrites à partir du fichier brut."""
+    described = {
+        "artist_structure": "0 = groupe, 1 = solo, 2 = duo ; +0,5 si un invité est répertorié (0,5 · 1,5 · 2,5)",
+        "artist": "crédit complet tel qu’affiché par Billboard, ex. « Rihanna feat. Drake », « Lady Gaga & Bruno Mars »",
+        "discogs_genre": "un ou plusieurs genres séparés par « ; », ex. « Rock;Pop »",
+        "artist_place_of_origin": "un ou plusieurs pays séparés par « ; », ex. « Canada;United States »",
+        "songwriters": "noms séparés par « ; », ex. « Janice Johnson;Perry Kibble »",
+        "songwriters_w_o_interpolation_sample_credits": "noms séparés par « ; », sans les auteurs crédités au titre d’un sample ou d’une interpolation",
+        "producers": "noms séparés par « ; »",
+    }
+    values = raw_data(DATA.stat().st_mtime_ns)[column]
+    known = values.dropna()
+    if column in described:
+        text = described[column]
+    elif set(known.unique()) <= {0, 1}:
+        text = "0 = non, 1 = oui"
+    elif pd.api.types.is_numeric_dtype(known):
+        text = f"nombre, de {number(known.min())} à {number(known.max())}"
+    else:
+        text = f"texte, ex. « {known.iloc[0]} »"
+    missing = int(values.isna().sum())
+    return text + (f" ; vide = non renseigné ({missing} titre{'s' if missing > 1 else ''})" if missing else "")
+
+
+def detail_block(columns=None, notes=(), essentials=False):
+    used = sources(route)
+    source_note = ("**Données Billboard utilisées** · titres datés par `date` (1re semaine au n°1)\n\n"
+                   "| Colonne | Valeurs possibles |\n|---|---|\n"
+                   + "\n".join(f"| `{c}` | {field_values(c)} |" for c in used)) if used else None
+    return details(frames, all_data, genre, columns, notes, essentials, footer=source_note)
 
 
 def trend_notes(data):
@@ -202,18 +269,42 @@ def temporal_table(data):
 
 
 if route == "summary":
+    # Parcours de chaque onglet en tête ; les anciens repères chiffrés restent en bas pour mémoire.
+    st.subheader("1 · Comment les caractéristiques musicales évoluent-elles ?")
+    journey("Format & son · de la tendance au détail du son", [
+        ("Évolution musicale", "Comment chaque caractéristique a-t-elle bougé ?"),
+        ("Durée des titres", "Combien de temps dure un n°1 ?"),
+        ("Durée des introductions", "Combien de temps avant la voix ?"),
+        ("Caractéristiques sonores", "Quel tempo, quelle énergie ?"),
+        ("Rôle central", "Quel instrument porte le morceau ?"),
+        ("Présence de sections", "Des cordes ou des cuivres ?"),
+        ("Genres", "Dans quels genres se rangent les n°1 ?")])
+    st.subheader("2 · D’où viennent les artistes associés aux n°1 ?")
+    journey("Origines des artistes · de la tendance au pays", [
+        ("Évolution des origines", "La part d’artistes non américains a-t-elle bougé ?"),
+        ("Composition des origines", "Américains, mixtes ou hors États-Unis ?"),
+        ("Pays et territoires", "De quels pays viennent les artistes ?")])
+    st.subheader("3 · Comment les profils et les modes de création évoluent-ils ?")
+    journey("Profils et création · de l’artiste aux coulisses du morceau", [
+        ("Âge", "Qui est l’artiste ?"),
+        ("Seul ou à plusieurs", "Avec qui sort-il le titre ?"),
+        ("Équipes", "Combien de personnes l’ont écrit et produit ?"),
+        ("Samples et reprises", "À partir de quoi est-il fait ?")])
+
+    st.divider()
+    st.subheader("Repères chiffrés (ancienne synthèse, gardée pour mémoire)")
     kpi_cards([median_card(frames, "length_sec", "Durée médiane", is_duration=True),
                median_card(frames, "intro_length_sec", "Introduction médiane", is_duration=True)], frames)
     st.write("Trois lectures pour situer un projet artistique : caractéristiques musicales, origines, profils et création. Chaque titre compte une fois, à sa première semaine au n°1.")
     st.caption("Observatoire descriptif des seuls n°1 : aucune recette du succès, prédiction ou norme de production. Fichier : 4 août 1958–11 janvier 2025.")
-    st.subheader("1 · Comment les caractéristiques musicales évoluent-elles ?")
+    st.markdown("**1 · Caractéristiques musicales**")
     st.write(metric_message(frames, "length_sec", "Durée", "s") + " " + metric_message(frames, "intro_length_sec", "Introduction", "s"))
     left, right = st.columns(2)
     with left:
         shortcut("Voir la durée des titres", "duration")
     with right:
         shortcut("Voir la durée des introductions", "intro")
-    st.subheader("2 · D’où viennent les artistes associés aux n°1 ?")
+    st.markdown("**2 · Origines**")
     kpi_cards([share_card(frames, "Uniquement États-Unis", lambda d: d.origin_group.eq(next(iter(ORIGINS))), lambda d: d.origins.map(bool)),
                share_card(frames, "Uniquement hors États-Unis", lambda d: d.origin_group.eq("Hors États-Unis uniquement"), lambda d: d.origins.map(bool))], frames)
     left, right = st.columns(2)
@@ -221,7 +312,7 @@ if route == "summary":
         shortcut("Voir la composition des origines", "origins")
     with right:
         shortcut("Comparer les pays et territoires", "map")
-    st.subheader("3 · Comment les profils et les modes de création évoluent-ils ?")
+    st.markdown("**3 · Profils et création**")
     st.write(metric_message(frames, "writers_original", "Auteurs hors samples/interpolations", "personnes"))
     kpi_cards([median_card(frames, "front_person_age", "Âge médian du frontperson", "ans"),
                median_card(frames, "writers_original", "Auteurs hors samples/interpolations · médiane", "personnes")], frames)
@@ -239,15 +330,12 @@ elif route in ("format_trend", "origin_trend"):
         label, unit = METRICS[metric]
         numeric_summary(frames, metric, label, unit)
         data = decades(filtered, column=metric, coverage=(first, last))
-        title_columns += [metric]
-        title_metric = metric
         median = True
     else:
         metric = st.selectbox("Composition", list(ORIGINS)[:3], format_func=ORIGINS.get, key="origin_metric")
         kpi_cards([share_card(frames, ORIGINS[metric], lambda d: d.origin_group.eq(metric), lambda d: d.origins.map(bool))], frames)
         data = decades(filtered, origin=metric, coverage=(first, last))
         unit, median = "%", False
-        title_columns = ["artist_place_of_origin", "origin_group", "foreign_language"]
     trend_notes(data)
     render(trend(data, unit, years_a, years_b, median=median), route)
     if median:
@@ -257,9 +345,106 @@ elif route in ("format_trend", "origin_trend"):
             numeric_table(frames, metric, unit)
         temporal_table(data)
 
-elif route in ("duration", "intro", "sound", "ages", "teams"):
+elif route in ("ages", "teams"):
+    # Profils et création : KPI A/B compact puis graphique. Le reste va dans Détails.
+    if route == "ages":
+        metric, label, unit = "front_person_age", "Âge médian", "ans"
+        notes = ["L’âge retenu est celui de l’artiste principal au moment du n°1 ; pour un groupe, celui de son leader (moyenne s’ils sont plusieurs)."]
+    else:
+        role = st.radio("Équipe", ["Auteurs", "Producteurs"], horizontal=True, key="team_role", label_visibility="collapsed")
+        metric = "writers_original" if role == "Auteurs" else "producer_count"
+        label, unit = f"{role} (médiane)", "personnes"
+        notes = []
+    view = st.radio("Affichage", ["Comparaison des périodes", "Évolution par décennie"], horizontal=True,
+                    key="teams_view" if route == "teams" else "ages_view", label_visibility="collapsed")
+    kpi_cards([short_median_card(frames, metric, label, unit)], frames, compact=True)
+    for name, d in zip(labels.values(), frames.values()):
+        if 0 < d[metric].count() < 10:
+            st.warning(f"{name} : {d[metric].count()} valeurs seulement, prudence.")
+    if view == "Évolution par décennie":
+        data = decades(filtered, column=metric, coverage=(first, last))
+        render(trend(data, unit, years_a, years_b, y_title=AXES[metric]), f"{route}_trend", height=540)
+    else:
+        render(distribution(frames, metric, unit), route, height=460)
+        values = frames["Référence B"][metric].dropna()
+        # Guide écrit dans les mots de la mesure affichée : âge des artistes, nombre d'auteurs ou de producteurs.
+        if route == "ages":
+            low = "les artistes les plus jeunes et les plus âgés"
+            example = (f"*Ex. : en {labels['Référence B']}, la moitié des artistes avaient entre {number(values.quantile(.25))} "
+                       f"et {number(values.quantile(.75))} ans au moment de leur n°1.*")
+            median = f"la moitié des artistes avaient {number(values.median())} ans ou moins au moment de leur n°1, l’autre moitié {number(values.median())} ans ou plus"
+        else:
+            who = "auteurs" if metric == "writers_original" else "producteurs"
+            low = f"les n°1 avec le moins et le plus de {who}"
+            example = (f"*Ex. : en {labels['Référence B']}, la moitié des n°1 comptent entre {number(values.quantile(.25))} "
+                       f"et {number(values.quantile(.75))} {who}.*")
+            median = f"la moitié des n°1 comptent {number(values.median())} {who} ou moins, l’autre moitié {number(values.median())} ou plus"
+        if not len(values):
+            example, median = "", "la valeur du milieu"
+        st.markdown(f"""
+**Comment lire la boîte** · une boîte par période.
+- **Le trait au milieu de la boîte** : la médiane ; en {labels['Référence B']}, {median}. Le losange rappelle la même valeur.
+- **La boîte** : la moitié des n°1, ceux du milieu (Q1–Q3). {example}
+- **Les traits verticaux (moustaches)** : jusqu’où vont {low}, hors cas extrêmes.
+- **Les points isolés** : les cas extrêmes, très au-dessus ou très en dessous des autres.{" Ceux qui sortent du cadre sont listés en haut, après ▲." if route == "ages" else ""}
+
+Une boîte plus haute indique des valeurs plus élevées ; une boîte plus étirée, des n°1 plus différents entre eux.
+""")
+    with detail_block({metric: label}, notes, essentials=True):
+        numeric_table(frames, metric, unit)
+        if view == "Évolution par décennie":
+            temporal_table(data)
+        if route == "ages":
+            st.markdown("**Âge par genre**")
+            for period, d in frames.items():
+                grouped = d.explode("genres").groupby("genres").front_person_age.agg(["median", "count"])
+                st.caption(labels[period])
+                st.dataframe(grouped[grouped["count"] >= 5].sort_values("count", ascending=False).head(12)
+                             .rename(columns={"median": "Âge médian (ans)", "count": "Exploitables"}).rename_axis("Genre"), width="stretch")
+
+elif route in ("formats", "reuse"):
+    if route == "formats":
+        order = ["Solo", "Duo ou groupe constitué", "Featuring", "Co-signature"]
+        if any(d.credit_type.eq("Non renseigné").any() for d in frames.values()):
+            order.append("Non renseigné")
+        data = share_frame(frames, "credit_type")
+        category_legend(order, large=True)
+        render(stacked(frames, "credit_type", order, vertical=True), route, height=580)
+        st.markdown("""
+**Comment lire les 4 cases** · chaque n°1 est rangé dans une seule case.
+- **Solo** : un seul artiste au crédit, sans invité. *Ex. : Taylor Swift, Harry Styles.*
+- **Duo ou groupe constitué** : un groupe ou un duo qui existe en tant que tel, avec un nom et une carrière commune. *Ex. : Maroon 5, Coldplay, Silk Sonic (Bruno Mars et Anderson .Paak réunis sous un seul nom).*
+- **Featuring** : un artiste principal invite un autre artiste sur son titre ; le crédit contient « feat. ». *Ex. : Rihanna feat. Drake.*
+- **Co-signature** : deux artistes ou plus, chacun avec sa propre carrière, signent le titre à égalité ; le crédit contient « & ». *Ex. : Ariana Grande & Justin Bieber.*
+""")
+        notes = []
+    else:
+        columns = REUSE
+        data = binary_frame(frames, columns)
+        notes = []
+        # Une pratique quasi absente des deux périodes écrase l'échelle : on la donne en clair.
+        rare = [label for label in columns.values() if data[data["catégorie"].eq(label)].part.fillna(0).max() < 3]
+        shown = [label for label in columns.values() if label not in rare]
+        render(points(data, frames, shown, y_title="Pratique"), route, height=140 + 90 * len(shown))
+        for label in rare:
+            counts = data[data["catégorie"].eq(label)].set_index("période").reindex(list(frames))
+            kpi_cards([(f"{label} · quasi absente des n°1",
+                        [f"{int(r.effectif)} titre{'s' if r.effectif > 1 else ''} ({number(r.part)} %)" for r in counts.itertuples()],
+                        None)], frames, compact=True, tone="alert")
+        st.markdown("**Comment lire les flèches** · vers la droite, la pratique progresse ; vers la gauche, elle recule. "
+                    "Plus la flèche est longue, plus l’écart entre les deux périodes est grand.")
+        st.markdown("""
+**Les 3 pratiques** · un même titre peut en cumuler plusieurs, le total ne fait donc pas 100 %.
+- **Sample** : un extrait d’un enregistrement existant est repris tel quel dans le morceau. *Ex. : Not Like Us, Kendrick Lamar.*
+- **Interpolation** : une mélodie ou des paroles d’un autre titre sont rejouées ou réécrites, sans reprendre l’enregistrement. *Ex. : A Bar Song (Tipsy), Shaboozey.*
+- **Reprise** : une nouvelle version d’un titre existant. *Ex. : Lady Marmalade, Christina Aguilera, Lil’ Kim, Mýa & Pink.*
+""")
+    with detail_block(notes=notes, essentials=True):
+        simple_comparison(data, frames, order if route == "formats" else list(columns.values()),
+                          "Type de crédit" if route == "formats" else "Pratique")
+
+elif route in ("duration", "intro", "sound"):
     notes = [BOX_NOTE, "Les moustaches s’étendent aux valeurs dans 1,5 intervalle interquartile. Toutes les valeurs exploitables contribuent aux calculs."]
-    view = "Distribution des périodes"
     if route in ("duration", "intro"):
         metric = "length_sec" if route == "duration" else "intro_length_sec"
         label, unit = METRICS[metric]
@@ -268,39 +453,12 @@ elif route in ("duration", "intro", "sound", "ages", "teams"):
         metric = st.selectbox("Indicateur sonore", list(METRICS)[2:], format_func=lambda c: METRICS[c][0], key="sonic")
         label, unit = METRICS[metric]
         notes += ["Énergie, dansabilité et caractère acoustique : scores Spotify de 0 à 100. BPM et dB gardent leurs unités."]
-    elif route == "ages":
-        metric, label, unit = "front_person_age", "Âge renseigné", "ans"
-        st.caption(AGE_NOTE)
-    else:
-        metric = st.selectbox("Personnes distinctes par titre", list(CREDITS), format_func=CREDITS.get, key="credit")
-        label, unit = CREDITS[metric], "personnes"
-        view = st.radio("Lecture des équipes", ["Distribution des périodes", "Évolution par décennie"], horizontal=True, key="teams_view")
-        notes += [CREDIT_NOTE]
     numeric_summary(frames, metric, label, unit)
-    if view == "Évolution par décennie":
-        data = decades(filtered, column=metric, coverage=(first, last))
-        trend_notes(data)
-        render(trend(data, unit, years_a, years_b), "teams_trend")
-    else:
-        render(distribution(frames, metric, unit, points=False if route in ("duration", "intro") else "outliers"), route)
-        st.caption("Survoler le losange de chaque boîte pour les chiffres, également accessibles dans Détails.")
+    render(distribution(frames, metric, unit, points=False if route in ("duration", "intro") else "outliers"), route)
+    st.caption("Survoler le losange de chaque boîte pour les chiffres, également accessibles dans Détails.")
     st.caption(BOX_NOTE)
-    title_metric = metric
-    title_columns += [metric]
-    if route in ("ages", "teams"):
-        title_columns = ["front_person_age", "artist_format", "listed_guest", "collaboration_credit", "collaboration_status",
-                         "featured_artists", "songwriters", "songwriters_w_o_interpolation_sample_credits", "producers", *CREDITS, *REUSE]
     with detail_block({metric: label}, notes):
         numeric_table(frames, metric, unit)
-        if view == "Évolution par décennie":
-            temporal_table(data)
-        if route == "ages":
-            st.markdown("**Âge par genre · au moins 5 valeurs exploitables**")
-            for period, d in frames.items():
-                grouped = d.explode("genres").groupby("genres").front_person_age.agg(["median", "count"])
-                st.caption(labels[period])
-                st.dataframe(grouped[grouped["count"] >= 5].sort_values("count", ascending=False).head(12)
-                             .rename(columns={"median": "Âge médian (ans)", "count": "Exploitables"}).rename_axis("Genre"), width="stretch")
 
 elif route in ("central", "presence", "genres"):
     columns = BASED if route == "central" else PRESENT
@@ -311,37 +469,26 @@ elif route in ("central", "presence", "genres"):
         st.caption("Top 9 selon la moyenne des parts des deux périodes : chaque période disponible pèse autant. « Non renseigné » reste visible. Les genres se cumulent ; le total peut dépasser 100 %.")
         notes = ["Une période vide est exclue du classement. Les absences de catégorie dans une période non vide valent zéro. En cas d’égalité, ordre alphabétique. Toutes les catégories sont disponibles ci-dessous et dans le filtre."]
         columns = {"discogs_genre": "Genre Discogs"}
-        title_columns = ["discogs_genre", "length_sec", "intro_length_sec"]
     else:
         data, order = binary_frame(frames, columns), list(columns.values())
         st.caption("Indicateurs cumulables ; tous les titres filtrés au dénominateur. Le rôle central se distingue de la présence d’une section et ne mesure pas la complexité musicale.")
         for col, label in columns.items():
             coverage_note(frames, column=col, label=label)
         notes = ["Rôle central : l’instrument ou la voix structure l’arrangement. Présence de sections : cordes ou cuivres/vents présents, sans présumer un rôle central."]
-        title_columns += list(columns)
     st.write(category_message(data, frames, order))
     render(bars(data, frames, order), route)
     with detail_block(columns, notes):
         all_order = sorted(data["catégorie"].unique())
         st.dataframe(display_comparison(comparison_rows(data, frames, all_order), frames), hide_index=True, width="stretch")
 
-elif route in ("origins", "formats"):
-    if route == "origins":
-        column, order = "origin_group", list(ORIGINS.values())
-        notes = [ORIGIN_NOTE, "Une seule catégorie par titre, y compris les non classables."]
-        category_legend(order, ORIGIN_HELP)
-        coverage_note(frames, list_column="origins", label="Origines exploitables")
-        title_columns = ["artist_place_of_origin", "origin_group", "foreign_language"]
-    else:
-        column, order = "artist_format", ["Groupe", "Duo", "Solo", "Non renseigné"]
-        notes = ["Format indépendant des invités et des associations au crédit. Codes source : 0 groupe, 1 solo, 2 duo ; +0,5 invité. Les inconnus restent dans le total."]
-        category_legend(order)
-        coverage_note(frames, column="artist_structure", label="Format d’artiste")
-        title_columns = ["front_person_age", "artist_format", "listed_guest", "featured_artists", "collaboration_credit", "collaboration_status"]
+elif route == "origins":
+    column, order = "origin_group", list(ORIGINS.values())
+    notes = [ORIGIN_NOTE, "Une seule catégorie par titre, y compris les non classables."]
+    category_legend(order, ORIGIN_HELP)
+    coverage_note(frames, list_column="origins", label="Origines exploitables")
     view = st.radio("Lecture de la composition", ["Composition à 100 %", "Comparaison des périodes"], horizontal=True, key=f"composition_{route}")
     data = share_frame(frames, column)
-    if column == "origin_group":
-        data["catégorie"] = data["catégorie"].replace(ORIGINS)
+    data["catégorie"] = data["catégorie"].replace(ORIGINS)
     st.write(category_message(data, frames, order))
     if view == "Composition à 100 %":
         render(stacked(frames, column, order), route)
@@ -349,15 +496,14 @@ elif route in ("origins", "formats"):
     else:
         render(points(data, frames, order), route)
         shares_summary(data, frames, order)
-    if route == "origins":
-        with st.expander("Complément proposé · paroles non anglaises"):
-            st.caption("Réintégration proposée, arbitrage collectif ouvert : le cadrage conserve cet indicateur. Il ne précise pas la langue ; origine et langue sont distinctes.")
-            kpi_cards([share_card(frames, "Présence de paroles non anglaises", lambda d: d.foreign_language.eq(1), lambda d: d.foreign_language.notna())], frames)
-            st.caption("Peu de titres concernés : éviter les conclusions générales sur les langues.")
-            for period, d in frames.items():
-                st.caption(labels[period] + " · croisement descriptif avec les origines")
-                st.dataframe(d.assign(présence=d.foreign_language.map({0: "Non", 1: "Oui"}).fillna("Non renseigné"))
-                             .groupby(["origin_group", "présence"]).size().rename("Titres").rename_axis(["Origines", "Paroles non anglaises"]), width="stretch")
+    with st.expander("Complément proposé · paroles non anglaises"):
+        st.caption("Réintégration proposée, arbitrage collectif ouvert : le cadrage conserve cet indicateur. Il ne précise pas la langue ; origine et langue sont distinctes.")
+        kpi_cards([share_card(frames, "Présence de paroles non anglaises", lambda d: d.foreign_language.eq(1), lambda d: d.foreign_language.notna())], frames)
+        st.caption("Peu de titres concernés : éviter les conclusions générales sur les langues.")
+        for period, d in frames.items():
+            st.caption(labels[period] + " · croisement descriptif avec les origines")
+            st.dataframe(d.assign(présence=d.foreign_language.map({0: "Non", 1: "Oui"}).fillna("Non renseigné"))
+                         .groupby(["origin_group", "présence"]).size().rename("Titres").rename_axis(["Origines", "Paroles non anglaises"]), width="stretch")
     with detail_block(notes=notes):
         st.dataframe(display_comparison(comparison_rows(data, frames, order), frames), hide_index=True, width="stretch")
 
@@ -382,69 +528,25 @@ elif route == "map":
         for r in rows.itertuples():
             st.caption(f"{labels[r.période]} · {country} : {number(r.part)} % · {r.effectif}/{r.total} titres" if pd.notna(r.part) else f"{labels[r.période]} · {country} : non disponible")
         shares_summary(comparisons, frames, [country])
-    title_columns = ["artist_place_of_origin", "origin_group", "foreign_language"]
-    # Le choix d’un pays est aussi appliqué à la sélection contextuelle des titres.
-    if country != "Tous":
-        source = data[data.pays.eq(country)].source.iloc[0]
-        title_frames = {p: d.loc[d.origins.map(lambda values: source in values).astype(bool)]
-                        for p, d in frames.items()}
     with detail_block(notes=[ORIGIN_NOTE, "Un pays documenté mais absent de la sélection vaut zéro. Gris : pays non documenté ou aucune origine exploitable.",
                              "« Unites States » est normalisé en United States. « Columbia » est normalisé en Colombia sur le titre We Don't Talk About Bruno : correction étayée par les biographies Disney du casting, sans vérification exhaustive de chaque origine du casting.",
                              "Carte : localiser ; barres à base commune : comparer. Les petites îles restent accessibles par repère et sélecteur."]):
         st.dataframe(display_comparison(comparison_rows(comparisons, frames, sorted(data.pays.unique())), frames), hide_index=True, width="stretch")
 
-elif route in ("collabs", "reuse"):
-    if route == "collabs":
-        data = collaboration_frame(frames)
-        columns = {"listed_guest": "Invité répertorié", "collaboration_credit": "Association d’artistes au crédit"}
-        st.caption("Invité répertorié ≠ featuring commercial : il peut être instrumentiste. Une association au crédit est distincte du format solo/duo/groupe.")
-        st.caption("Associations : mentions explicites, cas documentés ou inférences à partir de crédits distincts du corpus. Les crédits composés non résolus restent indéterminés, jamais négatifs.")
-        notes = ["Un séparateur seul ne suffit pas. Formations documentées, dont Simon & Garfunkel, exclues ; Coldplay & BTS et les groupes/duos avec ft. restent inclus. Voir le détail de chaque titre et livrables/AUDIT_COLLABORATIONS.md."]
-        for col, label in columns.items():
-            coverage_note(frames, column=col, label=label)
-        title_columns = ["front_person_age", "artist_format", "listed_guest", "featured_artists", "collaboration_credit", "collaboration_status", "collaboration_evidence"]
-        view = "Comparaison des périodes"
-    else:
-        columns = REUSE
-        data = binary_frame(frames, columns)
-        view = st.radio("Lecture des pratiques", ["Comparaison des périodes", "Évolution par décennie"], horizontal=True, key="reuse_view")
-        st.caption("Sample, interpolation et reprise peuvent se cumuler. Parts sur tous les titres filtrés ; aucun total à 100 %.")
-        notes = ["Écart entre la référence et la période étudiée, en points de pourcentage. Par exemple 20 % → 25 % = +5 points. Aucune variation relative calculée sur une base nulle."]
-        title_columns = ["artist_format", "songwriters", "songwriters_w_o_interpolation_sample_credits", "producers", *CREDITS, *REUSE]
-    if view == "Évolution par décennie":
-        metric = st.selectbox("Pratique", list(REUSE), format_func=REUSE.get, key="reuse_metric")
-        kpi_cards([share_card(frames, REUSE[metric], lambda d: d[metric].eq(1), lambda d: d[metric].notna())], frames)
-        temporal = decades(filtered, binary=metric, coverage=(first, last))
-        trend_notes(temporal)
-        render(trend(temporal, "%", years_a, years_b, median=False), "reuse_trend")
-    else:
-        st.write(category_message(data, frames, list(columns.values())))
-        render(points(data, frames, list(columns.values())), route)
-        shares_summary(data, frames, list(columns.values()))
-        if route == "reuse":
-            for col, label in columns.items():
-                coverage_note(frames, column=col, label=label)
-    st.caption("Dénominateur : tous les titres filtrés. Les cas indéterminés limitent la comparaison même s’ils ne sont pas comptés au numérateur.")
-    with detail_block(columns, notes):
-        st.dataframe(display_comparison(comparison_rows(data, frames, list(columns.values())), frames), hide_index=True, width="stretch")
-        if view == "Évolution par décennie":
-            temporal_table(temporal)
-
 elif route in ("data_a", "data_b"):
     period = "Période A" if route == "data_a" else "Référence B"
-    view = selection_table(frames[period].sort_values(["date", "song", "artist"], kind="stable"))
+    data = frames[period].sort_values(["date", "song", "artist"], kind="stable")
+    query = st.text_input("Rechercher un titre ou un artiste", key=f"search_{route}")
+    if query.strip():
+        data = data[data.song.str.contains(query.strip(), case=False, regex=False, na=False)
+                    | data.artist.str.contains(query.strip(), case=False, regex=False, na=False)]
+    view = selection_table(data, [*TABLE_COLUMNS, "front_person_age", "artist_format", "collaboration", "writers_original",
+                                  "producer_count", "sample", "interpolation", "cover"])
     show_table(view, route, labels[period])
-    with detail_block(notes=["Le tableau et le CSV proviennent du même objet, sans arrondir les valeurs. Le nombre de semaines au n°1 n’est pas un décompte de semaines situées dans la période filtrée."]):
-        st.markdown("**Artistes les plus représentés**")
-        st.caption("Classement par crédit complet et par titre, sans décompte d’artistes uniques.")
-        st.dataframe(frames[period].artist.value_counts().head(10).rename_axis("Artiste / crédit complet").rename("Titres"), width="stretch")
-
-if not route.startswith("data_"):
-    title_explorer(title_frames, title_columns, route, title_metric)
 
 
 def back_top():
     st.session_state.scroll_token += 1
 
 
-st.button("↑ Retour en haut", key="back_top", on_click=back_top)
+st.button("Haut", key="back_top", icon=":material/arrow_upward:", on_click=back_top, help="Retour en haut de la page")

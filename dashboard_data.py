@@ -2,6 +2,7 @@
 import pandas as pd
 
 from analysis import category_shares
+from collaboration_rules import FEATURING  # noqa: F401  (réexporté pour ui)
 
 ORIGINS = {
     "États-Unis uniquement (dont Porto Rico)": "Uniquement États-Unis",
@@ -22,11 +23,11 @@ METRICS = {
     "acousticness": ("Caractère acoustique", "score / 100"),
     "loudness_d_b": ("Niveau sonore", "dB"),
 }
-CREDITS = {"writers_original": "Auteurs hors samples/interpolations", "writers_all": "Auteurs tous crédits", "producer_count": "Producteurs"}
+CREDITS = {"writers_original": "Auteurs (sans les crédits de samples)", "writers_all": "Auteurs (crédits de samples inclus)", "producer_count": "Producteurs"}
 REUSE = {"sample": "Sample", "interpolation": "Interpolation", "cover": "Reprise"}
 AXES = {"length_sec": "Durée (secondes)", "intro_length_sec": "Introduction (secondes)",
-        "front_person_age": "Âge renseigné (années)",
-        **{c: "Nombre de personnes créditées" for c in CREDITS},
+        "front_person_age": "Âge (années)",
+        **{c: "Nombre de personnes créditées" for c in CREDITS}, "writers_original": "Nombre d’auteurs crédités", "producer_count": "Nombre de producteurs crédités",
         **{c: f"{label} ({unit})" for c, (label, unit) in METRICS.items() if c not in ("length_sec", "intro_length_sec")}}
 # Correspondance explicite des libellés présents dans le CSV, sans géocodage externe.
 COUNTRIES = {
@@ -74,21 +75,6 @@ def decades(df, column=None, origin=None, coverage=None, binary=None):
             values = d[column].dropna()
             row.update(value=values.median(), q1=values.quantile(.25), q3=values.quantile(.75), valid=len(values))
         rows.append(row)
-    return pd.DataFrame(rows)
-
-
-def collaboration_frame(frames):
-    rows = []
-    for period, data in frames.items():
-        for label, column, valid_column in [
-            ("Invité répertorié", "listed_guest", "listed_guest"),
-            ("Association d’artistes au crédit", "collaboration_credit", "collaboration_credit"),
-        ]:
-            count = int(data[column].eq(True).sum())
-            valid = int(data[valid_column].notna().sum())
-            rows.append({"catégorie": label, "effectif": count, "renseignés": valid,
-                         "part": 100 * count / len(data) if len(data) and valid else float("nan"),
-                         "période": period, "total": len(data)})
     return pd.DataFrame(rows)
 
 

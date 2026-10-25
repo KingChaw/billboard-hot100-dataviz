@@ -91,7 +91,7 @@ def go_to(app, route):
         ['summary'],
         ['format_trend', 'duration', 'intro', 'sound', 'central', 'presence', 'genres'],
         ['origin_trend', 'origins', 'map'],
-        ['ages', 'formats', 'collabs', 'teams', 'reuse'],
+        ['ages', 'formats', 'teams', 'reuse'],
         ['data_a', 'data_b'],
     ]
     group = next(i for i, routes in enumerate(groups) if route in routes)
@@ -100,7 +100,7 @@ def go_to(app, route):
 
 
 ROUTES = ['format_trend', 'duration', 'intro', 'sound', 'central', 'presence', 'genres',
-          'origin_trend', 'origins', 'map', 'ages', 'formats', 'collabs', 'teams', 'reuse']
+          'origin_trend', 'origins', 'map', 'ages', 'formats', 'teams', 'reuse']
 
 
 class DashboardJourneys(unittest.TestCase):
@@ -128,7 +128,7 @@ class DashboardJourneys(unittest.TestCase):
             with self.subTest(route=route):
                 self.go(route)
                 self.assertEqual(len(self.app.get('plotly_chart')), 1)
-                self.assertTrue(self.app.get('download_button'))
+                self.assertFalse(self.app.get('download_button'))  # Export regroupé dans Données.
                 detail = [e for e in self.app.expander if e.label == 'Détails']
                 self.assertEqual(len(detail), 1)
                 self.assertFalse(detail[0].proto.expanded)
@@ -136,7 +136,6 @@ class DashboardJourneys(unittest.TestCase):
             self.go(route)
             self.assertFalse(self.app.get('plotly_chart'))
             self.assertTrue(self.app.get('download_button'))
-        self.assertIn('Titres associés', (ROOT / 'ui.py').read_text())
 
     def test_all_shortcuts_preserve_filters(self):
         self.app.selectbox(key='genre').set_value('Pop').run()
@@ -167,7 +166,6 @@ class DashboardJourneys(unittest.TestCase):
     def test_selectors_persist_across_pages(self):
         for route, key, values in [
             ('sound', 'sonic', ['energy', 'danceability', 'acousticness', 'loudness_d_b', 'bpm']),
-            ('teams', 'credit', ['writers_all', 'producer_count', 'writers_original']),
             ('format_trend', 'evolution_metric', ['length_sec', 'intro_length_sec', 'bpm', 'energy', 'danceability', 'acousticness', 'loudness_d_b']),
             ('origin_trend', 'origin_metric', ['États-Unis uniquement (dont Porto Rico)', 'Mixte États-Unis / autres', 'Hors États-Unis uniquement'])]:
             self.go(route)
@@ -196,7 +194,7 @@ class DashboardJourneys(unittest.TestCase):
         self.app.slider(key='years_b').set_value((1960, 1969)).run()
         self.app.selectbox(key='genre').set_value('Jazz').run()
         self.go('teams')
-        self.app.selectbox(key='credit').set_value('producer_count').run()
+        self.app.radio(key='team_role').set_value('Producteurs').run()
         self.clean()
         self.assertIn('Non disponible', json.dumps(self.chart()))
 

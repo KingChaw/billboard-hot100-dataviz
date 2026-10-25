@@ -12,7 +12,7 @@ from analysis import binary_shares, credits, origin_group, prepare, select
 from collaboration_rules import qualify_credits
 from dashboard_data import CREDITS, REUSE, comparison_rows, decades, overlap_message, ranked_categories
 from charts import binary_frame, share_frame, stacked, trend, distribution
-from ui import metric_message, representative_titles, selection_table
+from ui import metric_message, selection_table
 from test_regression import go_to, ROOT, ROUTES, title_rows, TableParser
 
 
@@ -148,12 +148,6 @@ class Corrections(unittest.TestCase):
         bruno=self.df[self.df.song.str.strip().eq("We Don't Talk About Bruno")].iloc[0]
         self.assertEqual(bruno.origins,['Colombia','United States'])
         self.assertIn('Columbia',bruno.artist_place_of_origin)  # Export brut inchangé.
-        d=select(self.df,(2020,2024))
-        examples=representative_titles(d,'intro_length_sec')
-        self.assertEqual(examples.song.str.strip().tolist(),['cardigan','Life Goes On','Like That'])
-        self.assertEqual(examples.intro_length_sec.tolist(),[7,11,18])
-        self.assertEqual(len(representative_titles(d.iloc[:0],'intro_length_sec')),0)
-        self.assertEqual(len(representative_titles(d.iloc[:1],'intro_length_sec')),1)
 
     def test_displayed_box_quartiles_match_calculated_values(self):
         frames={'Période A':select(self.df,(2010,2019)), 'Référence B':select(self.df,(2020,2024))}
@@ -191,17 +185,13 @@ class NewJourneys(unittest.TestCase):
             self.go(route)
 
     def test_added_modes_and_persistent_indicators(self):
-        for route, key, options, selector in [
-            ('teams','teams_view',list(CREDITS),'credit'),('reuse','reuse_view',list(REUSE),'reuse_metric')]:
+        for route, key in [('teams','teams_view'),('ages','ages_view')]:
             self.go(route)
             self.app.radio(key=key).set_value('Évolution par décennie').run()
-            for metric in options:
-                self.app.selectbox(key=selector).set_value(metric).run()
-                self.assertFalse(self.app.exception)
+            self.assertFalse(self.app.exception)
             self.go('summary'); self.go(route)
             self.assertEqual(self.app.radio(key=key).value,'Évolution par décennie')
-            self.assertEqual(self.app.selectbox(key=selector).value,options[-1])
-        for route in ['formats','origins']:
+        for route in ['origins']:
             self.go(route)
             self.app.radio(key='composition_'+route).set_value('Comparaison des périodes').run()
             self.assertFalse(self.app.exception)
@@ -211,31 +201,18 @@ class NewJourneys(unittest.TestCase):
         self.go('intro')
         text=' '.join(x.value for x in self.app.markdown)
         self.assertIn('10 à 11 s',text)
-        self.app.radio(key='titles_period_intro').set_value('Référence B').run()
+        self.go('data_b')
         with patch('streamlit.download_button',wraps=st.download_button) as download:
-            self.app.checkbox(key='examples_intro').check().run()
+            self.app.text_input(key='search_data_b').input('cardigan').run()
             raw=download.call_args.args[1]
         csv=pd.read_csv(io.BytesIO(raw))
-        self.assertEqual(csv['Titre'].str.strip().tolist(),['cardigan','Life Goes On','Like That'])
+        self.assertEqual(csv['Titre'].str.strip().tolist(),['cardigan'])
         self.assertEqual(title_rows(self.app)[1:],csv.astype(object).where(csv.notna(), 'Non disponible').astype(str).values.tolist())
         self.app.selectbox(key='decade_a').set_value('recent').run()
         self.assertIn('identiques',' '.join(x.value for x in self.app.warning))
         self.app.selectbox(key='decade_b').set_value(2020).run()
         self.assertIn('2025',' '.join(x.value for x in self.app.warning))
         self.assertIn('chevauchent',' '.join(x.value for x in self.app.warning))
-        self.go('summary'); self.go('intro')
-        self.assertTrue(self.app.checkbox(key='examples_intro').value)
-        self.assertEqual(self.app.radio(key='titles_period_intro').value,'Référence B')
-
-    def test_contextual_exports_match_rendered_cells_in_all_dimensions(self):
-        for route in ['sound','central','map','teams','collabs','reuse']:
-            with patch('streamlit.download_button',wraps=st.download_button) as download:
-                self.go(route)
-                exported=pd.read_csv(io.BytesIO(download.call_args.args[1]),dtype=str,keep_default_na=False)
-            rows=title_rows(self.app)
-            self.assertEqual(rows[0],exported.columns.tolist())
-            self.assertEqual(rows[1:],exported.replace('', 'Non disponible').values.tolist(),route)
-
 
 if __name__=='__main__':
     unittest.main()

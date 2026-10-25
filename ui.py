@@ -7,7 +7,7 @@ import streamlit as st
 
 from periods import period_labels, difference_label, export_slug
 from charts import CATEGORY_COLORS
-from dashboard_data import METRICS, CREDITS, comparison_rows
+from dashboard_data import FEATURING, METRICS, CREDITS, comparison_rows
 
 
 def number(value, digits=1):
@@ -33,8 +33,9 @@ def header(years_a, years_b, frames, genre):
     st.markdown('<div class="selection">' + ''.join(items) + '</div>', unsafe_allow_html=True)
 
 
-def kpi_cards(cards, frames):
-    html = '<div class="kpi-grid' + (' single' if len(cards) == 1 else '') + '">'
+def kpi_cards(cards, frames, compact=False, tone=None):
+    html = ('<div class="kpi-grid' + (' single' if len(cards) == 1 else '') + (' compact' if compact else '')
+            + (f' {tone}' if tone else '') + '">')
     for title, values, foot in cards:
         html += f'<article class="kpi"><h3>{escape(title)}</h3><div class="kpi-values">'
         for value, label, suffix in zip(values, period_labels(frames).values(), ["a", "b"]):
@@ -72,6 +73,21 @@ def share_card(frames, title, predicate, valid_predicate=None):
     foot = "Écart : " + (f"{'+' if delta > 0 else ''}{number(delta)} points" if pd.notna(delta) else "non disponible")
     foot += f" ({difference_label(frames)})"
     return title, values, foot + " · " + " · ".join(counts)
+
+
+def sign(value):
+    return ("+" if value > 0 else "") + number(value)
+
+
+def short_median_card(frames, column, title, unit):
+    """Carte A/B réduite à l'essentiel : valeurs, unité, n."""
+    values = [number(d[column].median()) + f" {unit}" if d[column].notna().any() else "Non disponible" for d in frames.values()]
+    return title, values, None
+
+
+def short_share_card(frames, title, predicate):
+    values = [number(100 * predicate(d).sum() / len(d)) + " %" if len(d) else "Non disponible" for d in frames.values()]
+    return title, values, None
 
 
 def metric_message(frames, column, label, unit):
@@ -121,6 +137,17 @@ def shares_summary(data, frames, order):
     return table
 
 
+def simple_comparison(data, frames, order, first_column):
+    """Tableau lisible pour un A&R : part, effectif et écart en points."""
+    table = comparison_rows(data, frames, order)
+    st.dataframe(pd.DataFrame({
+        first_column: table["Indicateur"],
+        **{name: [f"{number(p)} % ({c} titre{"s" if c > 1 else ""})" for p, c in zip(table[f"{x} (%)"], table[f"{x} · titres concernés"])]
+           for x, name in zip("AB", period_labels(frames).values())},
+        "Écart (points)": [f"{sign(v)}" if pd.notna(v) else "Non disponible" for v in table["B − A (points)"]]}),
+        hide_index=True, width="stretch")
+
+
 def category_message(data, frames, order):
     table = comparison_rows(data, frames, order)
     if table.empty or table["B − A (points)"].notna().sum() == 0:
@@ -151,9 +178,9 @@ def coverage_note(frames, column=None, label="Données", list_column=None):
     st.caption(label + " · " + " · ".join(notes))
 
 
-def category_legend(categories, help_text=None):
+def category_legend(categories, help_text=None, large=False):
     """Aide native au survol, au clavier et au toucher directement dans la légende."""
-    html = '<div class="category-legend">'
+    html = '<div class="category-legend' + (' large' if large else '') + '">'
     for category in categories:
         label = f'<i style="background:{CATEGORY_COLORS[category]}"></i>{escape(category)}'
         if help_text and category in help_text:
@@ -176,8 +203,15 @@ def quality(frames, columns):
 
 
 @contextmanager
-def details(frames, all_data, genre, columns=None, notes=()):
+def details(frames, all_data, genre, columns=None, notes=(), essentials=False, footer=None):
     with st.expander("Détails", expanded=False):
+        if essentials:
+            for note in notes:
+                st.markdown(note)
+            yield
+            if footer:
+                st.markdown(footer)
+            return
         with st.container(height=260, border=False):
             quality(frames, columns or {})
             st.markdown("Les médianes utilisent les valeurs exploitables, sans remplacer les valeurs manquantes par zéro. "
@@ -194,15 +228,17 @@ def details(frames, all_data, genre, columns=None, notes=()):
             elif genre != "Tous les genres":
                 st.caption("Le filtre Discogs s’applique aux deux périodes et aux courbes ; les titres sans genre sont exclus.")
             yield
+            if footer:
+                st.markdown(footer)
 
 
 TABLE_LABELS = {"song": "Titre", "artist": "Artiste", "date": "Date", "discogs_genre": "Genre",
                 "artist_place_of_origin": "Origine", "length_sec": "Durée (s)", "intro_length_sec": "Intro (s)"}
 EXTRA_LABELS = {**{c: f"{label} ({unit})" for c, (label, unit) in METRICS.items()},
-                **CREDITS, "front_person_age": "Âge renseigné (ans)", "artist_format": "Format",
+                **CREDITS, "front_person_age": "Âge (ans)", "artist_format": "Format",
                 "listed_guest": "Invité répertorié", "featured_artists": "Invités (crédits source)",
                 "collaboration_credit": "Association au crédit", "collaboration_status": "Qualification du crédit",
-                "collaboration_evidence": "Justification du crédit", "foreign_language": "Paroles non anglaises",
+                "collaboration_evidence": "Justification du crédit", "collaboration": "Collaboration", "foreign_language": "Paroles non anglaises",
                 "songwriters": "Auteurs (noms)", "songwriters_w_o_interpolation_sample_credits": "Auteurs hors réutilisation (noms)",
                 "producers": "Producteurs (noms)", "sample": "Sample", "interpolation": "Interpolation", "cover": "Reprise",
                 "origin_group": "Composition des origines", "guitar_based": "Guitare centrale",
@@ -213,47 +249,24 @@ EXTRA_LABELS = {**{c: f"{label} ({unit})" for c, (label, unit) in METRICS.items(
 def selection_table(data, columns=None):
     """Un seul DataFrame pour le tableau et le CSV, avec la précision d'origine."""
     columns = list(dict.fromkeys(columns or TABLE_LABELS))
-    view = data[columns].copy()
+    view = data[[c for c in columns if c != "collaboration"]].copy()
+    if "collaboration" in columns:
+        view.insert(columns.index("collaboration"), "collaboration", None)
     view["date"] = view["date"].dt.date
+    if "collaboration" in view:
+        collaboration = data.collaboration_credit.map({True: "Co-signature", False: "Non"}).astype(object)
+        collaboration[data.collaboration_status.eq(FEATURING)] = "Featuring"
+        view["collaboration"] = collaboration.fillna("Non renseigné")
+    for column in ("sample", "interpolation", "cover"):
+        if column in view:
+            view[column] = view[column].map({1: "Oui", 0: "Non"}).fillna("Non renseigné")
     for column in ("listed_guest", "collaboration_credit"):
         if column in view:
             view[column] = view[column].map({True: "Oui", False: "Non"}).fillna("Indéterminé")
     return view.rename(columns={**EXTRA_LABELS, **TABLE_LABELS})
 
 
-def representative_titles(data, metric):
-    """Trois titres distincts proches de Q1, médiane, Q3 ; règle stable, non extrêmes."""
-    valid = data[data[metric].notna()].sort_values(["date", "song", "artist"], kind="stable")
-    chosen = []
-    for q in (.25, .5, .75):
-        available = valid.loc[~valid.index.isin(chosen)]
-        if not available.empty:
-            idx = (available[metric] - valid[metric].quantile(q)).abs().idxmin()
-            chosen.append(idx)
-    return valid.loc[chosen]
-
-
-def title_explorer(frames, columns, key, metric=None):
-    with st.expander("Titres associés · tableau et CSV", expanded=False):
-        period = st.radio("Titres de la période", list(frames), format_func=period_labels(frames).get, horizontal=True, key=f"titles_period_{key}")
-        query = st.text_input("Rechercher un titre ou un artiste", key=f"titles_query_{key}")
-        data = frames[period]
-        if query.strip():
-            data = data[data.song.str.contains(query.strip(), case=False, regex=False, na=False)
-                        | data.artist.str.contains(query.strip(), case=False, regex=False, na=False)]
-        if metric and st.checkbox("Trois exemples proches de Q1, de la médiane et de Q3", key=f"examples_{key}"):
-            data = representative_titles(data, metric)
-            st.caption("Ordre : proche de Q1, puis de la médiane, puis de Q3. Titres distincts ; jusqu’à trois selon la disponibilité. Ces exemples ne résument pas à eux seuls la période.")
-        else:
-            data = data.sort_values(["date", "song", "artist"], kind="stable")
-        view = selection_table(data, ["song", "artist", "date", *columns])
-        show_table(view, f"selection_{key}", period_labels(frames)[period])
-
-
 def show_table(view, key, period=None):
-    st.caption(f"{len(view)} titres affichés · même ordre, colonnes et valeurs dans le CSV. Date = première semaine au n°1.")
-    st.download_button("Télécharger cette sélection (CSV)", view.to_csv(index=False).encode("utf-8-sig"),
-                       f"billboard_{export_slug(period or key)}.csv", "text/csv", key=f"export_{key}")
     if view.empty:
         st.info("Aucun titre pour cette sélection.")
     # Table native HTML sans tri client caché : l’ordre reste celui de l’export.
@@ -261,3 +274,5 @@ def show_table(view, key, period=None):
     html = view.to_html(index=False, escape=True, na_rep="Non disponible", float_format=str,
                         classes="titles-table", border=0)
     st.html('<div class="titles-scroll" role="region" aria-label="Titres de la sélection" tabindex="0">' + html + '</div>')
+    st.download_button("Télécharger cette sélection (CSV)", view.to_csv(index=False).encode("utf-8-sig"),
+                       f"billboard_{export_slug(period or key)}.csv", "text/csv", key=f"export_{key}")

@@ -21,7 +21,7 @@ const select=async(key,text)=>{
  if(!chosen)throw Error(`Option absente: ${key} ${text}: ${options}`);
  await evaluate(`[...document.querySelectorAll('[role="option"]')].find(e=>e.innerText===${JSON.stringify(chosen)}).click()`);await settle();
 };
-const routeGroups=[['summary'],['format_trend','duration','intro','sound','central','presence','genres'],['origin_trend','origins','map'],['ages','formats','collabs','teams','reuse'],['data_a','data_b']];
+const routeGroups=[['summary'],['format_trend','duration','intro','sound','central','presence','genres'],['origin_trend','origins','map'],['ages','formats','teams','reuse'],['data_a','data_b']];
 const go=async route=>{
  const group=routeGroups.findIndex(routes=>routes.includes(route));
  await click(`.st-key-group_${group} button`);
@@ -47,7 +47,7 @@ try {
   await send('Input.dispatchMouseEvent',{type:'mouseMoved',x:rect.x+rect.width/2,y:rect.y+rect.height/2});await settle();
   const hover=await evaluate(`document.querySelector('.hoverlayer')?.textContent`);assert(hover.includes('Médiane'));assert(hover.includes('7–18'));reports.push({hover});
   await shot('apres-intro-infobulle');
-  await evaluate(`[...document.querySelectorAll('[data-testid="stMain"] details summary')].find(e=>e.innerText.includes('Titres associés')).click()`);await settle();
+  await evaluate(`[...document.querySelectorAll('[data-testid="stMain"] details summary')].find(e=>e.innerText.includes('Voir les morceaux concernés')).click()`);await settle();
   await radio('titles_period_intro','2020 – 2024');
   await click('.st-key-examples_intro input');
   const rows=await evaluate(`[...document.querySelectorAll('.titles-table tbody tr')].map(r=>[...r.querySelectorAll('td')].map(c=>c.innerText))`);
@@ -80,14 +80,14 @@ try {
   assert.equal(await evaluate(`document.querySelector('.category-legend details').open`),false);
   reports.push({touchLegend:true});
  } else {
-  const routes=['summary','format_trend','duration','intro','sound','central','presence','genres','origin_trend','origins','map','ages','formats','collabs','teams','reuse','data_a','data_b'];
+  const routes=['summary','format_trend','duration','intro','sound','central','presence','genres','origin_trend','origins','map','ages','formats','teams','reuse','data_a','data_b'];
   for(const width of [1440,390,320]){
    await dimensions(width,width===1440?900:844);
    for(const route of routes){
     await go(route);const m=await measure();reports.push({route,...m});
     if(route==='format_trend' && width<400)assert.equal(await evaluate(`document.querySelector('.js-plotly-plot').layout.xaxis.tickangle`),-55);
     assert.equal(m.errors.length,0);assert(m.scrollWidth<=m.mainWidth+1,`${route}/${width} dépasse horizontalement`);
-    if(['format_trend','origins','collabs','genres','map'].includes(route)) {
+    if(['format_trend','origins','genres','map'].includes(route)) {
      await shot(`apres-${route}-${width}`);
      if(width<768){
       await evaluate(`document.querySelector('.js-plotly-plot').scrollIntoView({block:'start'})`);await settle();

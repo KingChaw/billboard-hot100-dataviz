@@ -14,6 +14,57 @@ def normalized(value):
 
 
 ESTABLISHED_ACTS = {
+    # Vérification manuelle (25/10) : leader + groupe d’accompagnement, duo ou trio constitué ; Ray Parker, Jr. est un artiste solo.
+    **{name: "Vérification manuelle : formation ou nom d’artiste unique" for name in (
+        '? & the Mysterians',
+        'Archie Bell & the Drells',
+        'Billy Vera & the Beaters',
+        'Bo Donaldson & the Heywoods',
+        'Bobby "Boris" Pickett & the Crypt-Kickers',
+        'Bruce Hornsby & the Range',
+        'Captain & Tennille',
+        'Dale & Grace',
+        'David Rose & His Orchestra',
+        'Frankie Valli & the Four Seasons',
+        'Freddie & the Dreamers',
+        'Gary Lewis & the Playboys',
+        'Gladys Knight & the Pips',
+        'Gloria Estefan & Miami Sound Machine',
+        'Hamilton, Joe Frank & Reynolds',
+        'Henri Mancini & His Orchestra',
+        'Jan & Dean',
+        'Jimmy Gilmer & the Fireballs',
+        'Joan Jett & the Blackhearts',
+        'Joey Dee & the Starliters',
+        'John Fred & His Playboy Band',
+        'K-Ci & JoJo',
+        'Kool & the Gang',
+        'Lisa Lisa & Cult Jam',
+        'Lisa Loeb & Nine Stories',
+        'Marilyn McCoo & Billy Davis, Jr.',
+        'Maurice Williams & the Zodiacs',
+        'Mike & the Mechanics',
+        'Nino Tempo & April Stevens',
+        'Paul & Paula',
+        'Paul McCartney & Linda McCartney',
+        'Peaches & Herb',
+        'Percy Faith & His Orchestra',
+        'Peter & Gordon',
+        'Peter, Paul & Mary',
+        'Prince & the New Power Generation',
+        'Ray Parker, Jr.',
+        'Rick Dees & His Cast of Idiots',
+        'Ruby & the Romantics',
+        'Santo & Johnny',
+        'Smokey Robinson & the Miracles',
+        'Sonny & Cher',
+        'Tommy James & the Shondells',
+        'Tony Orlando & Dawn',
+        'Van McCoy & the Soul City Symphony',
+        'Walter Murphy & the Big Apple Band',
+        'Wayne Fontana & the Mindbenders',
+        'Zager & Evans',
+    )},
     "Diana Ross & The Supremes": "https://www.motownmuseum.org/artist/supremes/",
     "Simon & Garfunkel": "https://www.simonandgarfunkel.com/biography/",
     "Daryl Hall & John Oates": "https://rockhall.com/inductees/hall-and-oates/",
@@ -25,6 +76,12 @@ ESTABLISHED_ACTS = {
     "The Mamas & the Papas": "https://catalog.rockhall.com/rrhof-ais/Details/archive/110000022",
 }
 CONFIRMED_ASSOCIATIONS = {
+    # Vérification manuelle (25/10) : artistes ayant chacun une carrière propre, crédités ensemble sur un seul titre.
+    **{name: "Vérification manuelle : artistes solo crédités ensemble sur ce titre" for name in (
+        "Christina Aguilera, Lil' Kim, Mýa, & Pink", "Nelly, P. Diddy, & Murphy Lee", "Eminem, Dr. Dre, & 50 Cent",
+        "Jay-Z & Alicia Keys", "Cardi B, Bad Bunny, & J Balvin", "Post Malone & Swae Lee", "Lady Gaga & Bradley Cooper",
+        "Shawn Mendes & Camila Cabello", "Travis Scott & Kid Cudi",
+        'Bill Medley & Jennifer Warnes', 'Bryan Adams, Rod Stewart, & Sting', 'Dionne & Friends', 'Dionne Warwick & The Spinners', 'Elton John & Kiki Dee', 'Joe Cocker & Jennifer Warnes', 'John Travolta & Olivia Newton-John', 'Johnny Mathis & Deniece Williams', 'Michael Jackson & Siedah Garrett', 'Patti Austin & James Ingram', 'Patti LaBelle & Michael McDonald', 'Paul Anka & Odia Coates', 'Peabo Bryson & Regina Belle', 'Phil Collins & Marilyn Martin', 'Puff Daddy, Faith Evans, & 112', 'Paula Abdul & Wild Pair')},
     "Coldplay & BTS": "https://www.coldplay.com/my-universe-single-with-bts-on-september-24th/",
     "Sam Smith & Kim Petras": "https://www.universalmusic.ca/2022/10/24/sam-smiths-unholy-ft-kim-petras-is-no-1/",
     "The Kid Laroi & Justin Bieber": "https://www.sonymusic.ca/press_release/the-kid-laroi-and-justin-bieber-team-up-in-the-long-awaited-new-song-stay",
@@ -33,6 +90,7 @@ CONFIRMED_ASSOCIATIONS = {
     "Future, Metro Boomin, & Kendrick Lamar": "https://www.youtube.com/watch?v=N9bKBAA22Go",
     "Carolina Gaitán, Mauro Castillo, Adassa, Rhenzy Feliz, Diane Guerrero, Stephanie Beatriz, and the Encanto cast": "https://d23.com/why-everyone-is-talking-about-bruno-from-encanto/",
 }
+FEATURING = "Mention explicite ft./feat./featuring"
 FEATURE = re.compile(r"\b(?:ft\.?|feat\.?|featuring)\s", re.I)
 SEPARATOR = re.compile(r"\s(?:&|\+|and|with)\s|,", re.I)
 
@@ -53,7 +111,7 @@ def qualify_credits(df):
         if key in acts:
             rows.append((False, "Formation constituée documentée", acts[key]))
         elif FEATURE.search(str(artist)):
-            rows.append((True, "Mention explicite ft./feat./featuring", "Crédit source du titre"))
+            rows.append((True, FEATURING, "Crédit source du titre"))
         elif key in associations:
             rows.append((True, "Association documentée", associations[key]))
         elif SEPARATOR.search(str(artist)):

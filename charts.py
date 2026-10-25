@@ -18,6 +18,7 @@ CATEGORY_COLORS = {
     "Uniquement États-Unis": "#4266A8", "Mixte": "#92609D",
     "Uniquement hors États-Unis": "#287C6C", "Non classable": "#626D7D",
     "Groupe": "#4266A8", "Duo": "#92609D", "Solo": "#287C6C", "Non renseigné": "#626D7D",
+    "Duo ou groupe constitué": "#4266A8", "Featuring": "#92609D", "Co-signature": "#B8642E",
 }
 _viewport = components.declare_component("chart_viewport", path=str(Path(__file__).parent / "components" / "viewport"))
 
@@ -29,7 +30,7 @@ def style(fig, height=430):
         margin=dict(l=16, r=24, t=48, b=44),
         legend=dict(title_text="", orientation="h", x=0, y=1.02, yanchor="bottom", font=dict(size=12),
                     traceorder="normal", itemclick=False, itemdoubleclick=False),
-        hoverlabel=dict(bgcolor="#FFFFFF", font=dict(family=FONT, size=13), bordercolor="#DCDDE5"),
+        hoverlabel=dict(bgcolor="#FFFFFF", font=dict(family=FONT, size=13, color="#242631"), bordercolor="#DCDDE5"),
         separators=", ", bargap=.4, bargroupgap=.12, boxmode="group", dragmode=False,
     )
     fig.update_xaxes(automargin=True, showgrid=False, zeroline=False, title_font_size=12, fixedrange=True)
@@ -37,9 +38,10 @@ def style(fig, height=430):
     return fig
 
 
-def render(fig, key):
-    viewport = _viewport(page=key, key="chart_viewport", default={"height": 430, "width": 1200})
-    fig.update_layout(height=max(380, viewport["height"]))
+def render(fig, key, height=None):
+    # Hauteur fixe : pas de mesure de la fenêtre, donc pas de cadre de mesure ni de défilement.
+    viewport = {"height": height, "width": 1200} if height else _viewport(page=key, key="chart_viewport", default={"height": 430, "width": 1200})
+    fig.update_layout(height=height or max(380, viewport["height"]))
     if fig.layout.barmode == "group":
         categories = len(fig.layout.yaxis.categoryarray or [])
         fig.update_layout(height=max(380, viewport["height"], 120 + 44 * categories))
@@ -58,6 +60,10 @@ def render(fig, key):
     st.plotly_chart(fig, key=f"chart_{key}", use_container_width=True, theme=None,
                     config={"displayModeBar": False, "responsive": True, "scrollZoom": False,
                             "topojsonURL": "app/static/"})
+
+
+def number_fr(value):
+    return f"{value:.1f}".rstrip("0").rstrip(".").replace(".", ",")
 
 
 def empty_note(fig, text="Aucune valeur exploitable pour cette sélection"):
@@ -82,7 +88,7 @@ def distribution(frames, column, unit, points="outliers"):
         # sur certains effectifs (ex. 81 intros récentes : Q1 6,75 au lieu de 7).
         fig.add_trace(go.Box(x=[period], q1=[q1], median=[median], q3=[q3],
                              lowerfence=[lower], upperfence=[upper], name=labels[period],
-                             marker_color=COLORS[period], line_width=2, width=.45,
+                             marker_color=COLORS[period], line_width=2, width=.6,
                              boxpoints=False, hoverinfo="skip", showlegend=False))
         fig.add_trace(go.Scatter(x=[period], y=[median], mode="markers", name=labels[period],
                                  marker=dict(color=COLORS[period], size=12, symbol="diamond"), showlegend=False,
@@ -98,9 +104,27 @@ def distribution(frames, column, unit, points="outliers"):
                                      hovertemplate=labels[period] + "<br>Valeur : %{y} " + unit + "<extra></extra>"))
     style(fig)
     fig.update_layout(showlegend=False, margin_t=20)
-    fig.update_xaxes(categoryorder="array", categoryarray=PERIODS, tickmode="array", tickvals=PERIODS, ticktext=list(labels.values()))
+    fig.update_xaxes(categoryorder="array", categoryarray=PERIODS, tickmode="array", tickvals=PERIODS, ticktext=list(labels.values()),
+                     title="Période")
     fig.update_yaxes(title=AXES.get(column, unit))
-    if column != "loudness_d_b":
+    if column == "front_person_age":
+        # Une boîte n'a pas besoin de partir de 0 : l'axe suit les âges observés pour étaler les écarts.
+        # L'axe suit les moustaches : les boîtes occupent la hauteur. Les âges au-delà sont listés en haut.
+        bounds = []
+        for period in PERIODS:
+            values = frames[period][column].dropna()
+            if len(values):
+                q1, q3 = values.quantile([.25, .75])
+                bounds.append(values[values.between(q1 - 1.5 * (q3 - q1), q3 + 1.5 * (q3 - q1))].agg(["min", "max"]))
+        if bounds:
+            low, top = min(b["min"] for b in bounds) - 2, max(b["max"] for b in bounds) + 3
+            fig.update_yaxes(range=[low, top], dtick=5)
+            for period in PERIODS:
+                above = sorted(frames[period][column].dropna()[lambda v: v > top])
+                if above:
+                    fig.add_annotation(x=period, y=top, yshift=-10, showarrow=False, font=dict(color=COLORS[period], size=12),
+                                       text="▲ " + " · ".join(number_fr(v) for v in above) + " ans")
+    elif column != "loudness_d_b":
         fig.update_yaxes(rangemode="tozero")
     if column in ("energy", "danceability", "acousticness"):
         fig.update_yaxes(range=[-2, 102], tickvals=[0, 25, 50, 75, 100])
@@ -141,7 +165,7 @@ def aligned_shares(data, frames, order):
 
 def share_axes(fig, order):
     style(fig)
-    fig.update_xaxes(range=[0, 105], title="Titres (%)", ticksuffix=" %", tickvals=[0, 25, 50, 75, 100],
+    fig.update_xaxes(range=[0, 105], title="Titres n°1 (%)", ticksuffix=" %", tickvals=[0, 25, 50, 75, 100],
                      showgrid=True, gridcolor="#ECECF1")
     fig.update_yaxes(title=None, showgrid=False, categoryorder="array", categoryarray=order, autorange="reversed",
                      tickmode="array", tickvals=order,
@@ -171,20 +195,21 @@ def bars(data, frames, order):
     return fig
 
 
-def points(data, frames, order):
+def points(data, frames, order, y_title=None):
     data = aligned_shares(data, frames, order)
     labels = period_labels(frames)
     fig = go.Figure()
-    # Liaison descriptive ; les catégories ne constituent jamais une partition.
+    # Arrow chart (séance 4) : une flèche de A vers B montre le sens et l'amplitude du changement.
     for category in order:
         pair = data[data["catégorie"].eq(category)].set_index("période").reindex(PERIODS)
-        if pair.part.notna().all():
-            fig.add_trace(go.Scatter(x=pair.part, y=[category, category], mode="lines",
-                                     line=dict(color="#707989", width=3), showlegend=False, hoverinfo="skip"))
+        if pair.part.notna().all() and pair.part.iloc[0] != pair.part.iloc[1]:
+            fig.add_annotation(x=pair.part.iloc[1], y=category, ax=pair.part.iloc[0], ay=category, xref="x", yref="y",
+                               axref="x", ayref="y", showarrow=True, arrowhead=2, arrowsize=1.4, arrowwidth=2.5,
+                               arrowcolor="#8A90A0", standoff=9, startstandoff=7, text="")
     for i, period in enumerate(PERIODS):
         d = data[data["période"].eq(period)]
         fig.add_trace(go.Scatter(x=d.part, y=d["catégorie"], name=labels[period], mode="markers+text",
-                                 marker=dict(color=COLORS[period], size=12, symbol="circle" if i == 0 else "diamond"),
+                                 marker=dict(color=COLORS[period], size=14, symbol="circle" if i == 0 else "diamond"),
                                  text=[f"{v:.1f} %".replace(".", ",") if pd.notna(v) else "" for v in d.part],
                                  textposition="top center" if i == 0 else "bottom center", cliponaxis=False,
                                  customdata=d[["effectif", "total", "renseignés"]],
@@ -193,11 +218,15 @@ def points(data, frames, order):
             fig.add_annotation(x=50, y=row["catégorie"], yshift=14 if i == 0 else -14,
                                text=f"{labels[period]} : non disponible", showarrow=False)
     share_axes(fig, order)
-    fig.update_xaxes(range=[-5, 105])
+    # Base zéro, maximum adapté aux valeurs ; une demi-ligne de marge en haut et en bas.
+    top = min(100, max(25, 10 * np.ceil((data.part.max() if data.part.notna().any() else 90) / 10 + 1)))
+    fig.update_xaxes(range=[-top * .06, top], tickvals=None, dtick=10 if top <= 50 else 25)
+    fig.update_yaxes(autorange=False, range=[len(order) - .4, -.6], title=y_title)
+    fig.update_layout(margin_t=60, legend=dict(y=1.12, x=.5, xanchor="center"))
     return fig
 
 
-def stacked(frames, column, order):
+def stacked(frames, column, order, vertical=False):
     labels = period_labels(frames)
     fig = go.Figure()
     for category in order:
@@ -208,23 +237,29 @@ def stacked(frames, column, order):
             n = int(categories.eq(category).sum())
             counts.append([n, len(d)])
             shares.append(100 * n / len(d) if len(d) else np.nan)
-        fig.add_trace(go.Bar(x=shares, y=PERIODS, name=category, orientation="h", width=.5,
+        position = dict(x=PERIODS, y=shares) if vertical else dict(x=shares, y=PERIODS, orientation="h")
+        fig.add_trace(go.Bar(**position, name=category, width=.5,
                             marker_color=CATEGORY_COLORS[category], customdata=[[*count, labels[p]] for count, p in zip(counts, PERIODS)],
-                            text=[f"{v:.1f} %".replace(".", ",") if pd.notna(v) and v >= 6 else "" for v in shares],
-                            textposition="inside", insidetextanchor="middle", textfont_color="#FFFFFF",
-                            hovertemplate=category + " · %{customdata[2]}<br>%{x:.1f} %<br>%{customdata[0]} / %{customdata[1]} titres<extra></extra>"))
+                            text=[f"{v:.1f} %".replace(".", ",") if pd.notna(v) and v > 0 else "" for v in shares],
+                            textposition="inside", insidetextanchor="middle", textangle=0, textfont=dict(color="#FFFFFF", size=12),
+                            hovertemplate=category + " · %{customdata[2]}<br>%{" + ("y" if vertical else "x") + ":.1f} %<br>%{customdata[0]} / %{customdata[1]} titres<extra></extra>"))
     style(fig)
-    fig.update_layout(barmode="stack", showlegend=False, margin_t=20, uniformtext=dict(minsize=11, mode="hide"))
-    fig.update_xaxes(range=[0, 100], ticksuffix=" %", title="Titres (%)", dtick=25)
-    fig.update_yaxes(categoryorder="array", categoryarray=PERIODS, autorange="reversed", showgrid=False,
-                     tickmode="array", tickvals=PERIODS, ticktext=list(labels.values()))
+    fig.update_layout(barmode="stack", showlegend=False, margin_t=20, uniformtext=dict(minsize=11, mode="show"))
+    share_axis, period_axis = (fig.update_yaxes, fig.update_xaxes) if vertical else (fig.update_xaxes, fig.update_yaxes)
+    share_axis(range=[0, 100], ticksuffix=" %", title="Titres n°1 (%)", dtick=25)
+    # Ticks transparents : un peu d'air entre le libellé de période et les barres.
+    period_axis(title="Période", categoryorder="array", categoryarray=PERIODS, showgrid=False,
+                tickmode="array", tickvals=PERIODS, ticktext=list(labels.values()),
+                ticks="outside", ticklen=12, tickcolor="rgba(0,0,0,0)")
+    if not vertical:
+        fig.update_yaxes(autorange="reversed")
     for period in PERIODS:
         if frames[period].empty:
-            fig.add_annotation(x=50, y=period, text="Sélection vide", showarrow=False)
+            fig.add_annotation(x=period if vertical else 50, y=50 if vertical else period, text="Sélection vide", showarrow=False)
     return fig
 
 
-def trend(data, unit, years_a, years_b, median=True):
+def trend(data, unit, years_a, years_b, median=True, y_title=None):
     fig = go.Figure()
     if median:
         # Un polygone par séquence renseignée : la bande ne traverse jamais un trou.
@@ -235,7 +270,7 @@ def trend(data, unit, years_a, years_b, median=True):
                                      showlegend=False, hoverinfo="skip", connectgaps=False))
             fig.add_trace(go.Scatter(x=segment.position, y=segment.q3, mode="lines", line_width=0,
                                      fill="tonexty", fillcolor="rgba(97,83,173,.12)",
-                                     name="Moitié centrale (Q1–Q3)", showlegend=first_band,
+                                     name="Zone où se trouve la moitié des n°1 (Q1–Q3)", showlegend=first_band,
                                      hoverinfo="skip", connectgaps=False))
             first_band = False
     fig.add_trace(go.Scatter(x=data.position, y=data.value, mode="lines+markers", name="Médiane" if median else "Part des titres",
@@ -244,13 +279,13 @@ def trend(data, unit, years_a, years_b, median=True):
                              connectgaps=False, customdata=data[["label", "valid", "total", "q1", "q3"]],
                              hovertemplate="%{customdata[0]}<br>%{y:.1f} " + unit
                              + "<br>Valeurs exploitables : %{customdata[1]} / %{customdata[2]}"
-                             + ("<br>Q1–Q3 : %{customdata[3]:.1f} – %{customdata[4]:.1f} " + unit if median else "") + "<extra></extra>"))
+                             + ("<br>La moitié des n°1 (Q1–Q3) entre %{customdata[3]:.1f} et %{customdata[4]:.1f} " + unit if median else "") + "<extra></extra>"))
     style(fig)
     fig.update_xaxes(title="Périodes agrégées", tickmode="array", tickvals=data.position,
                      ticktext=data.label, tickangle=-30, range=[data.position.min() - 3, data.position.max() + 3],
                      showgrid=True, gridcolor="#ECECF1")
     fig.update_layout(margin_b=85)
-    fig.update_yaxes(title=unit)
+    fig.update_yaxes(title=y_title or unit)
     if not median:
         fig.update_yaxes(range=[0, 100], ticksuffix=" %")
     elif unit == "score / 100":

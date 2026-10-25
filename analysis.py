@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from collaboration_rules import qualify_credits
+from collaboration_rules import FEATURING, qualify_credits
 
 
 DATA = Path(__file__).resolve().parent / "data" / "billboard.csv"
@@ -71,6 +71,11 @@ def prepare(path=DATA):
     df["artist_format"] = rounded.map(FORMATS).fillna("Non renseigné")
     df["listed_guest"] = df["artist_structure"].apply(lambda x: pd.NA if pd.isna(x) else bool(x % 1 == 0.5)).astype("boolean")
     df = df.join(qualify_credits(df))
+    # Une seule case par titre : le featuring et la co-signature priment sur le format source,
+    # qui range les co-signatures ponctuelles (A & B) en duo ou en groupe.
+    df["credit_type"] = df["artist_format"].map({"Solo": "Solo", "Duo": "Duo ou groupe constitué", "Groupe": "Duo ou groupe constitué"}).fillna("Non renseigné")
+    df.loc[df["collaboration_credit"].eq(True).fillna(False), "credit_type"] = "Co-signature"
+    df.loc[df["collaboration_status"].eq(FEATURING), "credit_type"] = "Featuring"
     for source, target in [
         ("songwriters", "writers_all"),
         ("songwriters_w_o_interpolation_sample_credits", "writers_original"),
