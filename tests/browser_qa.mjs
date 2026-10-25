@@ -21,7 +21,12 @@ const select=async(key,text)=>{
  if(!chosen)throw Error(`Option absente: ${key} ${text}: ${options}`);
  await evaluate(`[...document.querySelectorAll('[role="option"]')].find(e=>e.innerText===${JSON.stringify(chosen)}).click()`);await settle();
 };
-const go=async route=>{await click(`.st-key-nav_${route} button`);};
+const routeGroups=[['summary'],['format_trend','duration','intro','sound','central','presence','genres'],['origin_trend','origins','map'],['ages','formats','collabs','teams','reuse'],['data_a','data_b']];
+const go=async route=>{
+ const group=routeGroups.findIndex(routes=>routes.includes(route));
+ await click(`.st-key-group_${group} button`);
+ await click(`.st-key-nav_${route} button`);
+};
 const dimensions=async(width,height)=>{await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<768});await settle();};
 const shot=async name=>{const s=await send('Page.captureScreenshot',{format:'png'});await fs.writeFile(`livrables/captures/${name}.png`,Buffer.from(s.data,'base64'));};
 const measure=()=>evaluate(`(()=>{const m=document.querySelector('[data-testid="stMain"]');const f=document.querySelector('.js-plotly-plot');return {title:document.querySelector('h1')?.innerText,width:innerWidth,height:innerHeight,mainWidth:m.clientWidth,scrollWidth:m.scrollWidth,scrollHeight:m.scrollHeight,scrollTop:m.scrollTop,charts:document.querySelectorAll('.js-plotly-plot').length,errors:[...document.querySelectorAll('[data-testid="stException"]')].map(e=>e.innerText),chart:f?f.getBoundingClientRect().toJSON():null}})()`);
@@ -33,7 +38,7 @@ try {
  await send('Page.reload',{ignoreCache:true});await new Promise(r=>setTimeout(r,1700));
  const reports=[];
  if(mode==='scenario'){
-  await select('decade_a','2010–2019');
+  await select('decade_a','2010 – 2019');
   await click('.st-key-shortcut_intro button');
   assert((await evaluate('document.body.innerText')).includes('10 à 11 s'));
   await shot('apres-intro-1440');
@@ -43,7 +48,7 @@ try {
   const hover=await evaluate(`document.querySelector('.hoverlayer')?.textContent`);assert(hover.includes('Médiane'));assert(hover.includes('7–18'));reports.push({hover});
   await shot('apres-intro-infobulle');
   await evaluate(`[...document.querySelectorAll('[data-testid="stMain"] details summary')].find(e=>e.innerText.includes('Titres associés')).click()`);await settle();
-  await radio('titles_period_intro','Référence B');
+  await radio('titles_period_intro','2020 – 2024');
   await click('.st-key-examples_intro input');
   const rows=await evaluate(`[...document.querySelectorAll('.titles-table tbody tr')].map(r=>[...r.querySelectorAll('td')].map(c=>c.innerText))`);
   assert.deepEqual(rows.map(r=>r[0].trim()),['cardigan','Life Goes On','Like That']);
@@ -94,7 +99,7 @@ try {
   await dimensions(1440,900);
   await go('teams');await radio('teams_view','Évolution par décennie');await shot('apres-equipes-evolution');
   await go('reuse');await radio('reuse_view','Évolution par décennie');await shot('apres-reutilisation-evolution');
-  await go('map');await radio('country_view','Comparaison A/B');await shot('apres-pays-comparaison');
+  await go('map');await radio('country_view','Comparaison des périodes');await shot('apres-pays-comparaison');
   await select('map_country','Porto Rico');await shot('apres-porto-rico');
   reports.push({territory:await evaluate(`document.querySelector('[data-testid="stMain"]').innerText`)});
   await go('origins');

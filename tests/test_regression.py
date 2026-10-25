@@ -11,6 +11,7 @@ from streamlit.testing.v1 import AppTest
 
 from analysis import binary_shares, category_shares, prepare, select
 from ui import duration, selection_table
+from periods import period_labels
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = json.loads((ROOT / 'tests/v2_baseline.json').read_text())
@@ -85,6 +86,19 @@ class AnalyticalRegression(unittest.TestCase):
         self.assertEqual(duration(float('nan')), 'Non disponible')
 
 
+def go_to(app, route):
+    groups = [
+        ['summary'],
+        ['format_trend', 'duration', 'intro', 'sound', 'central', 'presence', 'genres'],
+        ['origin_trend', 'origins', 'map'],
+        ['ages', 'formats', 'collabs', 'teams', 'reuse'],
+        ['data_a', 'data_b'],
+    ]
+    group = next(i for i, routes in enumerate(groups) if route in routes)
+    app.button(key=f'group_{group}').click().run()
+    app.button(key='nav_' + route).click().run()
+
+
 ROUTES = ['format_trend', 'duration', 'intro', 'sound', 'central', 'presence', 'genres',
           'origin_trend', 'origins', 'map', 'ages', 'formats', 'collabs', 'teams', 'reuse']
 
@@ -98,7 +112,7 @@ class DashboardJourneys(unittest.TestCase):
         self.assertFalse(self.app.exception, [x.message for x in self.app.exception])
 
     def go(self, route):
-        self.app.button(key='nav_' + route).click().run()
+        go_to(self.app, route)
         self.clean()
 
     def chart(self):
@@ -108,8 +122,8 @@ class DashboardJourneys(unittest.TestCase):
         self.assertEqual(self.app.radio(key='mode').value, 'Décennies')
         self.assertEqual(self.app.selectbox(key='decade_a').value, 2000)
         self.assertEqual(self.app.selectbox(key='decade_b').value, 'recent')
-        self.assertIn('129 titres', self.app.markdown[1].value)
-        self.assertIn('81 titres', self.app.markdown[1].value)
+        self.assertIn('129 titres', ' '.join(m.value for m in self.app.markdown))
+        self.assertIn('81 titres', ' '.join(m.value for m in self.app.markdown))
         for route in ROUTES:
             with self.subTest(route=route):
                 self.go(route)
@@ -269,7 +283,7 @@ class NewAggregates(unittest.TestCase):
         self.assertTrue(data[data['catégorie'].eq('Reprise')].part.isna().all())
         self.assertEqual(data.part.sum(), 400)
         fig = points(data, frames, list(columns.values()))
-        self.assertEqual([t.name for t in fig.data if t.showlegend is not False], list(frames))
+        self.assertEqual([t.name for t in fig.data if t.showlegend is not False], list(period_labels(frames).values()))
 
 
 if __name__ == '__main__':

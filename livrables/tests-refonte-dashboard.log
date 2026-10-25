@@ -1,0 +1,63 @@
+2026-10-25 17:00:20.790 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+test_dates_on_all_pages_and_comparison_tables (test_dashboard_layout.DashboardLayout) ... 2026-10-25 17:00:20.792 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_identical_periods_keep_two_series_and_two_data_pages (test_dashboard_layout.DashboardLayout) ... 2026-10-25 17:00:23.121 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_partial_dates_and_empty_period_identity (test_dashboard_layout.DashboardLayout) ... 2026-10-25 17:00:23.486 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_selected_bounds_survive_empty_filter_and_csv_uses_dates (test_dashboard_layout.DashboardLayout) ... 2026-10-25 17:00:23.522 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_sidebar_filters_and_remembered_subpage (test_dashboard_layout.DashboardLayout) ... 2026-10-25 17:00:23.744 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_absolute_points_unavailable_and_neutral_messages (test_improvements.Corrections) ... ok
+test_collaboration_review_and_incomplete_evidence (test_improvements.Corrections) ... ok
+test_displayed_box_quartiles_match_calculated_values (test_improvements.Corrections) ... ok
+test_empty_period_keeps_columns_after_genre_filter (test_improvements.Corrections) ... ok
+test_equal_period_weights_and_empty_period (test_improvements.Corrections) ... ok
+test_missing_zero_and_denominator (test_improvements.Corrections) ... ok
+test_origins_and_representative_titles (test_improvements.Corrections) ... ok
+test_reference_coverage_and_nonmonotonic_values (test_improvements.Corrections) ... ok
+test_temporal_credits_reuse_gaps_and_partial_labels (test_improvements.Corrections) ... ok
+test_added_modes_and_persistent_indicators (test_improvements.NewJourneys) ... 2026-10-25 17:00:24.254 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_ar_scenario_context_csv_and_overlap_warning (test_improvements.NewJourneys) ... 2026-10-25 17:00:25.964 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_contextual_exports_match_rendered_cells_in_all_dimensions (test_improvements.NewJourneys) ... 2026-10-25 17:00:26.589 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_country_comparisons_small_territory_and_empty_b (test_improvements.NewJourneys) ... 2026-10-25 17:00:27.391 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_default_results_identical (test_regression.AnalyticalRegression) ... ok
+test_display_preserves_half_second_and_missing (test_regression.AnalyticalRegression) ... ok
+test_export_exact_values (test_regression.AnalyticalRegression) ... ok
+test_source_files_unchanged (test_regression.AnalyticalRegression) ... ok
+test_all_shortcuts_preserve_filters (test_regression.DashboardJourneys) ... 2026-10-25 17:00:30.051 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_default_and_every_route (test_regression.DashboardJourneys) ... 2026-10-25 17:00:31.089 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_download_matches_displayed_rows (test_regression.DashboardJourneys) ... 2026-10-25 17:00:33.259 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_empty_one_or_both_periods_all_routes (test_regression.DashboardJourneys) ... 2026-10-25 17:00:33.558 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+./charts.py:135: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  subset["renseignés"] = subset["renseignés"].fillna(len(frames[period]))
+./charts.py:135: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  subset["renseignés"] = subset["renseignés"].fillna(len(frames[period]))
+./charts.py:135: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  subset["renseignés"] = subset["renseignés"].fillna(len(frames[period]))
+./charts.py:135: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  subset["renseignés"] = subset["renseignés"].fillna(len(frames[period]))
+ok
+test_missing_metric_is_not_zero (test_regression.DashboardJourneys) ... 2026-10-25 17:00:37.548 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_modes_keep_independent_choices_and_overlap (test_regression.DashboardJourneys) ... 2026-10-25 17:00:37.916 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_selectors_persist_across_pages (test_regression.DashboardJourneys) ... 2026-10-25 17:00:38.333 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_decade_values_from_real_rows (test_regression.NewAggregates) ... ok
+test_map_shared_scale_country_shares_and_unknowns (test_regression.NewAggregates) ... ok
+test_nonexclusive_points_and_missing_binary (test_regression.NewAggregates) ... ok
+test_stacked_totals_include_unknowns (test_regression.NewAggregates) ... ok
+
+----------------------------------------------------------------------
+Ran 33 tests in 20.274s
+
+OK

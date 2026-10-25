@@ -11,28 +11,29 @@ import streamlit.components.v1 as components
 from analysis import binary_shares, category_shares
 from dashboard_data import ORIGINS, AXES
 from theme import COLORS, FONT
+from periods import period_labels
 
 PERIODS = list(COLORS)
 CATEGORY_COLORS = {
-    "Uniquement États-Unis": "#547CC6", "Mixte": "#BC83C9",
-    "Uniquement hors États-Unis": "#5AB7A5", "Non classable": "#737D8D",
-    "Groupe": "#547CC6", "Duo": "#BC83C9", "Solo": "#5AB7A5", "Non renseigné": "#737D8D",
+    "Uniquement États-Unis": "#4266A8", "Mixte": "#92609D",
+    "Uniquement hors États-Unis": "#287C6C", "Non classable": "#626D7D",
+    "Groupe": "#4266A8", "Duo": "#92609D", "Solo": "#287C6C", "Non renseigné": "#626D7D",
 }
 _viewport = components.declare_component("chart_viewport", path=str(Path(__file__).parent / "components" / "viewport"))
 
 
 def style(fig, height=430):
     fig.update_layout(
-        template="plotly_dark", paper_bgcolor="#14171C", plot_bgcolor="#14171C",
-        font=dict(family=FONT, color="#F5F7FA", size=13), height=height,
+        template="plotly_white", paper_bgcolor="#FFFFFF", plot_bgcolor="#FFFFFF",
+        font=dict(family=FONT, color="#242631", size=13), height=height,
         margin=dict(l=16, r=24, t=48, b=44),
         legend=dict(title_text="", orientation="h", x=0, y=1.02, yanchor="bottom", font=dict(size=12),
                     traceorder="normal", itemclick=False, itemdoubleclick=False),
-        hoverlabel=dict(bgcolor="#191D24", font=dict(family=FONT, size=13), bordercolor="#505B6C"),
+        hoverlabel=dict(bgcolor="#FFFFFF", font=dict(family=FONT, size=13), bordercolor="#DCDDE5"),
         separators=", ", bargap=.4, bargroupgap=.12, boxmode="group", dragmode=False,
     )
     fig.update_xaxes(automargin=True, showgrid=False, zeroline=False, title_font_size=12, fixedrange=True)
-    fig.update_yaxes(automargin=True, gridcolor="#292F38", zeroline=False, title_font_size=12, fixedrange=True)
+    fig.update_yaxes(automargin=True, gridcolor="#ECECF1", zeroline=False, title_font_size=12, fixedrange=True)
     return fig
 
 
@@ -64,6 +65,7 @@ def empty_note(fig, text="Aucune valeur exploitable pour cette sélection"):
 
 
 def distribution(frames, column, unit, points="outliers"):
+    labels = period_labels(frames)
     fig = go.Figure()
     for period in PERIODS:
         data = frames[period]
@@ -79,13 +81,13 @@ def distribution(frames, column, unit, points="outliers"):
         # Quartiles pandas explicites : Plotly « linear » utilise une autre convention
         # sur certains effectifs (ex. 81 intros récentes : Q1 6,75 au lieu de 7).
         fig.add_trace(go.Box(x=[period], q1=[q1], median=[median], q3=[q3],
-                             lowerfence=[lower], upperfence=[upper], name=period,
+                             lowerfence=[lower], upperfence=[upper], name=labels[period],
                              marker_color=COLORS[period], line_width=2, width=.45,
                              boxpoints=False, hoverinfo="skip", showlegend=False))
-        fig.add_trace(go.Scatter(x=[period], y=[median], mode="markers", name=period,
+        fig.add_trace(go.Scatter(x=[period], y=[median], mode="markers", name=labels[period],
                                  marker=dict(color=COLORS[period], size=12, symbol="diamond"), showlegend=False,
                                  customdata=[[len(values), len(data), q1, q3, lower, upper]],
-                                 hovertemplate=period + "<br>Médiane : %{y} " + unit
+                                 hovertemplate=labels[period] + "<br>Médiane : %{y} " + unit
                                  + "<br>Moitié centrale : %{customdata[2]}–%{customdata[3]} " + unit
                                  + "<br>Moustaches : %{customdata[4]}–%{customdata[5]} " + unit
                                  + "<br>Exploitables : %{customdata[0]} / %{customdata[1]} titres<extra></extra>"))
@@ -93,10 +95,10 @@ def distribution(frames, column, unit, points="outliers"):
             outliers = values[(values < lower) | (values > upper)]
             fig.add_trace(go.Scatter(x=[period] * len(outliers), y=outliers, mode="markers", showlegend=False,
                                      marker=dict(color=COLORS[period], size=5),
-                                     hovertemplate=period + "<br>Valeur : %{y} " + unit + "<extra></extra>"))
+                                     hovertemplate=labels[period] + "<br>Valeur : %{y} " + unit + "<extra></extra>"))
     style(fig)
     fig.update_layout(showlegend=False, margin_t=20)
-    fig.update_xaxes(categoryorder="array", categoryarray=PERIODS)
+    fig.update_xaxes(categoryorder="array", categoryarray=PERIODS, tickmode="array", tickvals=PERIODS, ticktext=list(labels.values()))
     fig.update_yaxes(title=AXES.get(column, unit))
     if column != "loudness_d_b":
         fig.update_yaxes(rangemode="tozero")
@@ -140,7 +142,7 @@ def aligned_shares(data, frames, order):
 def share_axes(fig, order):
     style(fig)
     fig.update_xaxes(range=[0, 105], title="Titres (%)", ticksuffix=" %", tickvals=[0, 25, 50, 75, 100],
-                     showgrid=True, gridcolor="#292F38")
+                     showgrid=True, gridcolor="#ECECF1")
     fig.update_yaxes(title=None, showgrid=False, categoryorder="array", categoryarray=order, autorange="reversed",
                      tickmode="array", tickvals=order,
                      ticktext=["<br>".join(textwrap.wrap(label, width=22, break_long_words=False)) for label in order])
@@ -149,18 +151,19 @@ def share_axes(fig, order):
 
 def bars(data, frames, order):
     data = aligned_shares(data, frames, order)
+    labels = period_labels(frames)
     fig = go.Figure()
     # Trace et position A puis B, du haut vers le bas dans chaque catégorie.
     for i, period in enumerate(PERIODS):
         d = data[data["période"].eq(period)]
-        fig.add_trace(go.Bar(x=d.part, y=d["catégorie"], name=period, orientation="h",
+        fig.add_trace(go.Bar(x=d.part, y=d["catégorie"], name=labels[period], orientation="h",
                             marker_color=COLORS[period], offsetgroup=str(i),
                             customdata=d[["effectif", "total"]],
                             text=d.part, texttemplate="%{x:.1f} %", textposition="outside",
                             textfont_size=11, constraintext="none", cliponaxis=False,
-                            hovertemplate=period + " · %{y}<br>%{x:.1f} %<br>%{customdata[0]:.0f} / %{customdata[1]} titres<extra></extra>"))
+                            hovertemplate=labels[period] + " · %{y}<br>%{x:.1f} %<br>%{customdata[0]:.0f} / %{customdata[1]} titres<extra></extra>"))
         for _, row in d[d.part.isna()].iterrows():
-            fig.add_annotation(x=2, y=row["catégorie"], text=f"{period} : non disponible", xanchor="left",
+            fig.add_annotation(x=2, y=row["catégorie"], text=f"{labels[period]} : non disponible", xanchor="left",
                                yshift=9 if i == 0 else -9, font_size=11, showarrow=False)
     share_axes(fig, order)
     fig.update_layout(barmode="group", bargap=.2)
@@ -170,6 +173,7 @@ def bars(data, frames, order):
 
 def points(data, frames, order):
     data = aligned_shares(data, frames, order)
+    labels = period_labels(frames)
     fig = go.Figure()
     # Liaison descriptive ; les catégories ne constituent jamais une partition.
     for category in order:
@@ -179,39 +183,41 @@ def points(data, frames, order):
                                      line=dict(color="#707989", width=3), showlegend=False, hoverinfo="skip"))
     for i, period in enumerate(PERIODS):
         d = data[data["période"].eq(period)]
-        fig.add_trace(go.Scatter(x=d.part, y=d["catégorie"], name=period, mode="markers+text",
+        fig.add_trace(go.Scatter(x=d.part, y=d["catégorie"], name=labels[period], mode="markers+text",
                                  marker=dict(color=COLORS[period], size=12, symbol="circle" if i == 0 else "diamond"),
                                  text=[f"{v:.1f} %".replace(".", ",") if pd.notna(v) else "" for v in d.part],
                                  textposition="top center" if i == 0 else "bottom center", cliponaxis=False,
                                  customdata=d[["effectif", "total", "renseignés"]],
-                                 hovertemplate=period + " · %{y}<br>%{x:.1f} %<br>%{customdata[0]} / %{customdata[1]} titres<br>%{customdata[2]} valeurs renseignées<extra></extra>"))
+                                 hovertemplate=labels[period] + " · %{y}<br>%{x:.1f} %<br>%{customdata[0]} / %{customdata[1]} titres<br>%{customdata[2]} valeurs renseignées<extra></extra>"))
         for _, row in d[d.part.isna()].iterrows():
             fig.add_annotation(x=50, y=row["catégorie"], yshift=14 if i == 0 else -14,
-                               text=f"{period} : non disponible", showarrow=False)
+                               text=f"{labels[period]} : non disponible", showarrow=False)
     share_axes(fig, order)
     fig.update_xaxes(range=[-5, 105])
     return fig
 
 
 def stacked(frames, column, order):
+    labels = period_labels(frames)
     fig = go.Figure()
     for category in order:
         shares, counts = [], []
         for period in PERIODS:
             d = frames[period]
-            labels = d[column].replace(ORIGINS) if column == "origin_group" else d[column].fillna("Non renseigné")
-            n = int(labels.eq(category).sum())
+            categories = d[column].replace(ORIGINS) if column == "origin_group" else d[column].fillna("Non renseigné")
+            n = int(categories.eq(category).sum())
             counts.append([n, len(d)])
             shares.append(100 * n / len(d) if len(d) else np.nan)
         fig.add_trace(go.Bar(x=shares, y=PERIODS, name=category, orientation="h", width=.5,
-                            marker_color=CATEGORY_COLORS[category], customdata=counts,
+                            marker_color=CATEGORY_COLORS[category], customdata=[[*count, labels[p]] for count, p in zip(counts, PERIODS)],
                             text=[f"{v:.1f} %".replace(".", ",") if pd.notna(v) and v >= 6 else "" for v in shares],
-                            textposition="inside", insidetextanchor="middle", textfont_color="#0B0D10",
-                            hovertemplate=category + " · %{y}<br>%{x:.1f} %<br>%{customdata[0]} / %{customdata[1]} titres<extra></extra>"))
+                            textposition="inside", insidetextanchor="middle", textfont_color="#FFFFFF",
+                            hovertemplate=category + " · %{customdata[2]}<br>%{x:.1f} %<br>%{customdata[0]} / %{customdata[1]} titres<extra></extra>"))
     style(fig)
     fig.update_layout(barmode="stack", showlegend=False, margin_t=20, uniformtext=dict(minsize=11, mode="hide"))
     fig.update_xaxes(range=[0, 100], ticksuffix=" %", title="Titres (%)", dtick=25)
-    fig.update_yaxes(categoryorder="array", categoryarray=PERIODS, autorange="reversed", showgrid=False)
+    fig.update_yaxes(categoryorder="array", categoryarray=PERIODS, autorange="reversed", showgrid=False,
+                     tickmode="array", tickvals=PERIODS, ticktext=list(labels.values()))
     for period in PERIODS:
         if frames[period].empty:
             fig.add_annotation(x=50, y=period, text="Sélection vide", showarrow=False)
@@ -228,12 +234,12 @@ def trend(data, unit, years_a, years_b, median=True):
             fig.add_trace(go.Scatter(x=segment.position, y=segment.q1, mode="lines", line_width=0,
                                      showlegend=False, hoverinfo="skip", connectgaps=False))
             fig.add_trace(go.Scatter(x=segment.position, y=segment.q3, mode="lines", line_width=0,
-                                     fill="tonexty", fillcolor="rgba(181,190,205,.20)",
+                                     fill="tonexty", fillcolor="rgba(97,83,173,.12)",
                                      name="Moitié centrale (Q1–Q3)", showlegend=first_band,
                                      hoverinfo="skip", connectgaps=False))
             first_band = False
     fig.add_trace(go.Scatter(x=data.position, y=data.value, mode="lines+markers", name="Médiane" if median else "Part des titres",
-                             line=dict(color="#E2E7EE", width=2),
+                             line=dict(color="#6153AD", width=2),
                              marker=dict(size=9, symbol=["circle-open" if p else "circle" for p in data.partial]),
                              connectgaps=False, customdata=data[["label", "valid", "total", "q1", "q3"]],
                              hovertemplate="%{customdata[0]}<br>%{y:.1f} " + unit
@@ -242,7 +248,7 @@ def trend(data, unit, years_a, years_b, median=True):
     style(fig)
     fig.update_xaxes(title="Périodes agrégées", tickmode="array", tickvals=data.position,
                      ticktext=data.label, tickangle=-30, range=[data.position.min() - 3, data.position.max() + 3],
-                     showgrid=True, gridcolor="#292F38")
+                     showgrid=True, gridcolor="#ECECF1")
     fig.update_layout(margin_b=85)
     fig.update_yaxes(title=unit)
     if not median:
@@ -256,17 +262,17 @@ def trend(data, unit, years_a, years_b, median=True):
     return fig
 
 
-def world_map(data, period, selected_country=None):
+def world_map(data, period, selected_country=None, label=None):
     selected = data[data["période"].eq(period)]
     max_share = data.part.max()
     maximum = max(1, float(max_share)) if pd.notna(max_share) else 100
     fig = go.Figure(go.Choropleth(
         locations=selected.iso, z=selected.part, locationmode="ISO-3", zmin=0, zmax=maximum,
-        colorscale=[[0, "#263D56"], [.15, "#376A9A"], [.5, "#589FDB"], [1, "#B9E4FF"]],
-        marker_line_color="#101318", marker_line_width=.6,
+        colorscale=[[0, "#F0EFFA"], [.15, "#C9C4E8"], [.5, "#8C81C5"], [1, "#493C91"]],
+        marker_line_color="#FFFFFF", marker_line_width=.6,
         colorbar=dict(title="Titres (%)", thickness=12, len=.7, ticksuffix=" %"),
         customdata=selected[["pays", "effectif", "total"]],
-        hovertemplate="%{customdata[0]}<br>%{customdata[1]} / %{customdata[2]} titres<br>%{z:.1f} %<extra></extra>",
+        hovertemplate=(label or "Période sélectionnée") + "<br>%{customdata[0]}<br>%{customdata[1]} / %{customdata[2]} titres<br>%{z:.1f} %<extra></extra>",
     ))
     # Repères ponctuels : même les petites îles absentes du fond à cette échelle restent accessibles.
     small = {"PRI": (18.22, -66.59), "BRB": (13.19, -59.54), "TTO": (10.69, -61.22)}
@@ -278,17 +284,17 @@ def world_map(data, period, selected_country=None):
         fig.add_trace(go.Scattergeo(lat=[lat], lon=[lon], mode="markers", showlegend=False,
                                      marker=dict(size=7, color=[row.part], colorscale=fig.data[0].colorscale, cmin=0, cmax=maximum,
                                                  line=dict(color="#F5F7FA", width=.5)),
-                                     text=[f"{row.pays} · {int(row.effectif)} / {int(row.total)} titres · {row.part:.1f} %"],
+                                     text=[f"{label or 'Période sélectionnée'} · {row.pays} · {int(row.effectif)} / {int(row.total)} titres · {row.part:.1f} %"],
                                      hovertemplate="%{text}<extra></extra>"))
     if selected_country:
         row = selected[selected.pays.eq(selected_country)].iloc[0]
         fig.add_trace(go.Scattergeo(locations=[row.iso], locationmode="ISO-3", mode="markers",
-                                     marker=dict(size=15, color="#FFB454", symbol="circle-open", line_width=2),
+                                     marker=dict(size=15, color="#A65313", symbol="circle-open", line_width=2),
                                      showlegend=False, hoverinfo="skip"))
     style(fig)
     fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), geo=dict(
-        projection_type="natural earth", bgcolor="#14171C", showframe=False, showcoastlines=False,
-        showland=True, landcolor="#737D8D", showcountries=True, countrycolor="#232A33"))
+        projection_type="natural earth", bgcolor="#FFFFFF", showframe=False, showcoastlines=False,
+        showland=True, landcolor="#DADBE2", showcountries=True, countrycolor="#FFFFFF"))
     if selected.part.notna().sum() == 0:
         empty_note(fig, "Aucune origine exploitable pour cette période")
     return fig

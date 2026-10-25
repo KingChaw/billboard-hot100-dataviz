@@ -5,6 +5,7 @@ from html import escape
 import pandas as pd
 import streamlit as st
 
+from periods import period_labels, difference_label, export_slug
 from charts import CATEGORY_COLORS
 from dashboard_data import METRICS, CREDITS, comparison_rows
 
@@ -24,19 +25,20 @@ def duration(value):
 
 def header(years_a, years_b, frames, genre):
     items = []
+    labels = period_labels(frames)
     for (period, data), years, suffix in zip(frames.items(), [years_a, years_b], ["a", "b"]):
-        items.append(f'<span><b class="period-{suffix}">{"A" if suffix == "a" else "B"} · {years[0]}–{years[1]}</b>'
+        items.append(f'<span><b class="period-{suffix}">{escape(labels[period])}</b>'
                      f'<small>{len(data)} titres</small></span>')
     items.append(f'<span>{escape(genre)}</span>')
     st.markdown('<div class="selection">' + ''.join(items) + '</div>', unsafe_allow_html=True)
 
 
-def kpi_cards(cards):
+def kpi_cards(cards, frames):
     html = '<div class="kpi-grid' + (' single' if len(cards) == 1 else '') + '">'
     for title, values, foot in cards:
         html += f'<article class="kpi"><h3>{escape(title)}</h3><div class="kpi-values">'
-        for value, label, suffix in zip(values, ["A", "B"], ["a", "b"]):
-            html += (f'<div><span class="period-label period-{suffix}">{label}</span>'
+        for value, label, suffix in zip(values, period_labels(frames).values(), ["a", "b"]):
+            html += (f'<div><span class="period-label period-{suffix}">{escape(label)}</span>'
                      f'<div class="kpi-value">{escape(value)}</div></div>')
         html += '</div>' + (f'<div class="kpi-foot">{escape(foot)}</div>' if foot else '') + '</article>'
     st.markdown(html + '</div>', unsafe_allow_html=True)
@@ -49,17 +51,17 @@ def median_card(frames, column, title, unit="", is_duration=False):
         medians.append(value)
         values.append(duration(value) if is_duration else number(value) + (f" {unit}" if pd.notna(value) else ""))
     delta = medians[1] - medians[0]
-    foot = "Écart B − A : non disponible"
+    foot = f"Écart : non disponible ({difference_label(frames)})"
     if pd.notna(delta):
-        foot = f"B − A : {'+' if delta > 0 else ''}{number(delta)} {'s' if is_duration else unit}"
-    counts = [f"{p} : {d[column].count()}/{len(d)} exploitables" for p, d in zip(("A", "B"), frames.values())]
+        foot = f"Écart : {'+' if delta > 0 else ''}{number(delta)} {'s' if is_duration else unit} ({difference_label(frames)})"
+    counts = [f"{p} : {d[column].count()}/{len(d)} exploitables" for p, d in zip(period_labels(frames).values(), frames.values())]
     foot += " · " + " · ".join(counts)
     return title, values, foot
 
 
 def share_card(frames, title, predicate, valid_predicate=None):
     values, parts, counts = [], [], []
-    for label, data in zip(("A", "B"), frames.values()):
+    for label, data in zip(period_labels(frames).values(), frames.values()):
         valid = int(valid_predicate(data).sum()) if valid_predicate else len(data)
         count = int(predicate(data).sum())
         share = 100 * count / len(data) if len(data) and valid else float("nan")
@@ -67,7 +69,8 @@ def share_card(frames, title, predicate, valid_predicate=None):
         counts.append(f"{label} : {count}/{len(data)} titres · {valid} renseignés")
         values.append(number(share) + (" %" if pd.notna(share) else ""))
     delta = parts[1] - parts[0]
-    foot = "B − A : " + (f"{'+' if delta > 0 else ''}{number(delta)} points" if pd.notna(delta) else "non disponible")
+    foot = "Écart : " + (f"{'+' if delta > 0 else ''}{number(delta)} points" if pd.notna(delta) else "non disponible")
+    foot += f" ({difference_label(frames)})"
     return title, values, foot + " · " + " · ".join(counts)
 
 
@@ -75,17 +78,18 @@ def metric_message(frames, column, label, unit):
     a, b = [d[column].dropna().median() if d[column].notna().any() else float("nan") for d in frames.values()]
     if pd.isna(a) or pd.isna(b):
         return f"{label} : comparaison indisponible ; au moins une période n’a aucune valeur exploitable."
+    studied, reference = period_labels(frames).values()
     if a == b:
-        return f"{label} : médianes identiques, {number(a)} {unit} en A et B."
+        return f"{label} : médianes identiques, {number(a)} {unit} pour {studied} et {reference}."
     return (f"{label} : la médiane passe de {number(a)} à {number(b)} {unit} "
-            f"(B − A : {'+' if b > a else ''}{number(b - a)} {unit}).")
+            f"(écart : {'+' if b > a else ''}{number(b - a)} {unit} ; {reference} − {studied}).")
 
 
 def numeric_summary(frames, column, label, unit):
     st.write(metric_message(frames, column, label, unit))
-    kpi_cards([median_card(frames, column, label + " · médiane", unit)])
+    kpi_cards([median_card(frames, column, label + " · médiane", unit)], frames)
     notes = []
-    for name, data in zip(("A", "B"), frames.values()):
+    for name, data in zip(period_labels(frames).values(), frames.values()):
         values = data[column].dropna()
         if len(values):
             notes.append(f"{name} · moitié centrale : {number(values.quantile(.25))}–{number(values.quantile(.75))} {unit}")
@@ -99,7 +103,7 @@ def numeric_table(frames, column, unit):
     rows = []
     for period, data in frames.items():
         values = data[column].dropna()
-        rows.append({"Période": period, "Unité": unit, "Médiane": values.median(),
+        rows.append({"Période": period_labels(frames)[period], "Unité": unit, "Médiane": values.median(),
                      "Q1": values.quantile(.25), "Q3": values.quantile(.75),
                      "Minimum": values.min(), "Maximum": values.max(),
                      "Exploitables": len(values), "Titres": len(data)})
@@ -113,7 +117,7 @@ def shares_summary(data, frames, order):
         delta = row["B − A (points)"]
         text = f"{'+' if delta > 0 else ''}{number(delta)} points" if pd.notna(delta) else "comparaison indisponible"
         notes.append(f"{row['Indicateur']} : {text}")
-    st.caption("B − A · " + " · ".join(notes))
+    st.caption(f"Écart ({difference_label(frames)}) · " + " · ".join(notes))
     return table
 
 
@@ -123,17 +127,18 @@ def category_message(data, frames, order):
         return "Comparaison indisponible : au moins une période n’a pas de valeur exploitable."
     valid = table.dropna(subset=["B − A (points)"])
     if valid["B − A (points)"].eq(0).all():
-        return "Les parts des catégories comparables sont identiques en A et B."
+        return "Les parts des catégories comparables sont identiques pour les deux périodes."
     row = valid.loc[valid["B − A (points)"].abs().idxmax()]
     delta = row["B − A (points)"]
+    studied, reference = period_labels(frames).values()
     return (f"Parmi les catégories affichées, l’écart le plus grand concerne « {row['Indicateur']} » : "
-            f"{number(row['A (%)'])} % en A, {number(row['B (%)'])} % en B "
+            f"{number(row['A (%)'])} % pour {studied}, {number(row['B (%)'])} % pour {reference} "
             f"({'+' if delta > 0 else ''}{number(delta)} points).")
 
 
 def coverage_note(frames, column=None, label="Données", list_column=None):
     notes = []
-    for name, data in zip(("A", "B"), frames.values()):
+    for name, data in zip(period_labels(frames).values(), frames.values()):
         if list_column:
             valid = int(data[list_column].map(bool).sum())
         elif column == "discogs_genre":
@@ -164,7 +169,7 @@ def quality(frames, columns):
     for col, label in columns.items():
         for period, data in frames.items():
             valid = int(data[col].notna().sum())
-            rows.append({"Indicateur": label, "Période": period, "Exploitables": valid,
+            rows.append({"Indicateur": label, "Période": period_labels(frames)[period], "Exploitables": valid,
                          "Manquantes": len(data) - valid, "Titres": len(data)})
     if rows:
         st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
@@ -181,7 +186,7 @@ def details(frames, all_data, genre, columns=None, notes=()):
                 st.markdown(note)
             start, end = all_data.date.min(), all_data.date.max()
             st.caption(f"Couverture du fichier : {start:%d/%m/%Y}–{end:%d/%m/%Y}. Première et dernière années partielles. "
-                       "Les décennies marquées * sont incomplètes. Les intervalles A et B peuvent se chevaucher.")
+                       "Les décennies marquées * sont incomplètes. Les deux intervalles sélectionnés peuvent se chevaucher.")
             if min(map(len, frames.values())) < 10:
                 st.caption("Au moins une période contient moins de 10 titres : les parts sont sensibles aux petits effectifs.")
             if genre == "Non renseigné":
@@ -230,7 +235,7 @@ def representative_titles(data, metric):
 
 def title_explorer(frames, columns, key, metric=None):
     with st.expander("Titres associés · tableau et CSV", expanded=False):
-        period = st.radio("Titres de la période", list(frames), horizontal=True, key=f"titles_period_{key}")
+        period = st.radio("Titres de la période", list(frames), format_func=period_labels(frames).get, horizontal=True, key=f"titles_period_{key}")
         query = st.text_input("Rechercher un titre ou un artiste", key=f"titles_query_{key}")
         data = frames[period]
         if query.strip():
@@ -242,13 +247,13 @@ def title_explorer(frames, columns, key, metric=None):
         else:
             data = data.sort_values(["date", "song", "artist"], kind="stable")
         view = selection_table(data, ["song", "artist", "date", *columns])
-        show_table(view, f"selection_{key}")
+        show_table(view, f"selection_{key}", period_labels(frames)[period])
 
 
-def show_table(view, key):
+def show_table(view, key, period=None):
     st.caption(f"{len(view)} titres affichés · même ordre, colonnes et valeurs dans le CSV. Date = première semaine au n°1.")
     st.download_button("Télécharger cette sélection (CSV)", view.to_csv(index=False).encode("utf-8-sig"),
-                       f"billboard_{key}.csv", "text/csv", key=f"export_{key}")
+                       f"billboard_{export_slug(period or key)}.csv", "text/csv", key=f"export_{key}")
     if view.empty:
         st.info("Aucun titre pour cette sélection.")
     # Table native HTML sans tri client caché : l’ordre reste celui de l’export.

@@ -20,16 +20,19 @@ Aucune dépendance applicative supplémentaire.
 
 ## Utiliser
 
-- Navigation → Comparaison → Filtres, dans la barre latérale.
-- Au départ : **A 2000–2009 ; B 2020–2024, 81 titres**. Le menu distingue
+- Navigation en haut du contenu : rubrique, puis sous-page. La dernière sous-page
+  de chaque rubrique est mémorisée. La colonne gauche contient uniquement les filtres.
+- Au départ : **2000–2009 ; référence 2020–2024, 81 titres**. Le menu distingue
   **2020–janv. 2025, 82 titres**, partielle. Les intervalles personnalisés et les
   décennies conservent leurs réglages indépendants.
+- Les dates sélectionnées apparaissent dans les widgets, cartes, légendes,
+  infobulles, tableaux et noms des CSV. Deux sélections identiques restent distinctes.
 - Courbes, boîtes à moustaches séparées pour durée/intro, sélecteurs sonores,
   barres d’instruments et genres ; couverture Discogs visible.
-- Pays : **Carte / Comparaison A/B**, avec échelle commune et accès aux îles.
-  Compositions exclusives : **100 % / Comparaison A/B**.
+- Pays : **Carte / Comparaison des périodes**, avec échelle commune et accès aux îles.
+  Compositions exclusives : **100 % / Comparaison des périodes**.
 - Q3 organisée en profils, équipes de création, réutilisation. Les équipes et
-  pratiques ont une lecture A/B et une évolution par décennie.
+  pratiques ont une comparaison des périodes et une évolution par décennie.
 - **Titres associés · tableau et CSV** dans chaque analyse : recherche et
   exemples proches des quartiles. Tableau/export identiques, précision conservée.
 - **Détails** pour méthode et approfondissements ; retour en haut disponible.
@@ -63,7 +66,7 @@ Voir [VALIDATION.md](VALIDATION.md) pour les vérifications réellement exécut�
 
 - `analysis.py`, `collaboration_rules.py` : préparation et qualification des crédits.
 - `dashboard_data.py` : agrégats, couverture, classements, comparaisons.
-- `app.py`, `ui.py`, `charts.py`, `theme.py` : parcours, interface, figures.
+- `app.py`, `ui.py`, `charts.py`, `theme.py`, `periods.py` : parcours, interface, figures.
 - `components/` : dimensions des figures et position de lecture ; aucun service externe.
 - `static/` : fond de carte local ; `data/` : sources brutes inchangées.
 - [METHODES.md](METHODES.md) : définitions et limites.
@@ -73,8 +76,7 @@ Voir [VALIDATION.md](VALIDATION.md) pour les vérifications réellement exécut�
 - `livrables/avant/v2_locale.zip` : copie complète de l’état local avant correction.
   `PROPOSITION.md` et les références statistiques historiques sont conservées.
 
-Travail effectué à partir du projet local fourni, sans récupération d’une
-ancienne version GitHub, publication, modification du dépôt distant ou écriture
-dans le Google Doc. La copie locale n’a pas été comparée à un ZIP externe non
-joint à cette demande. L’accès de l’enseignant au mode de remise choisi reste
-à vérifier par le groupe.
+La refonte du dashboard reprend une navigation à deux niveaux et une colonne
+réservée aux filtres. Les calculs et données sont conservés. Les 33 tests et
+les vérifications sur ordinateur et mobile sont détaillés dans [VALIDATION.md](VALIDATION.md).
+L’accès de l’enseignant au dépôt privé reste à vérifier par le groupe.

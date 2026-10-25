@@ -134,9 +134,9 @@ def comparison_rows(data, frames, order):
 
 def overlap_message(a, b):
     if tuple(a) == tuple(b):
-        return "A et B sont identiques : mêmes titres, aucun changement temporel mesuré."
+        return "Les deux périodes sont identiques : mêmes titres, aucun changement temporel mesuré."
     if max(a[0], b[0]) <= min(a[1], b[1]):
-        return "A et B se chevauchent : des titres contribuent aux deux périodes."
+        return "Les deux périodes se chevauchent : des titres contribuent aux deux périodes."
     return None
 
 

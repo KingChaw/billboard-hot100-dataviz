@@ -1,3 +1,29 @@
+# Refonte du dashboard — 25 octobre 2026
+
+**33 tests réussis**, journal : [tests-refonte-dashboard.log](livrables/tests-refonte-dashboard.log).
+Commande : `PYTHONPYCACHEPREFIX=/private/tmp/billboard-pycache .venv/bin/python -m unittest discover -s tests -v`.
+
+Les parcours existants utilisent désormais la rubrique puis la sous-page. Les
+attentes de présentation ont été adaptées aux dates et aux nouveaux intitulés ;
+les références numériques, quartiles, données et contrôles d’export sont conservés.
+Cinq nouveaux tests couvrent la barre latérale limitée aux filtres, la mémoire
+des sous-pages, les libellés sur les 18 vues, les deux séries lors de périodes
+identiques, les dates de sélection même sans résultat et les noms des CSV.
+
+Contrôle manuel réel dans Chrome sur le serveur local `127.0.0.1:8502` :
+- Ordinateur : bandeau Billboard, filtres à gauche, deux rangées d’onglets,
+  synthèse, évolution musicale et distribution des introductions.
+- Mode responsive **390 px** : rangées d’onglets horizontales, accès au dernier
+  onglet « Genres », ouverture et fermeture du panneau de filtres, textes et cartes.
+- Les widgets et graphes observés affichent les dates des deux sélections.
+
+Les anciens rapports et captures ci-dessous documentent l’interface antérieure.
+Le script CDP `tests/browser_qa.mjs` a été adapté à la nouvelle navigation, mais
+n’a pas été exécuté pendant cette refonte. La vérification visuelle de cette
+intervention a utilisé Chrome par l’interface native.
+
+---
+
 # Validation reproduite — 28 septembre 2026
 
 Ce rapport remplace le rapport de travail précédent, conservé dans

@@ -15,7 +15,7 @@ Les comparaisons servent à situer un projet artistique.
 
 ## Périodes et filtres
 
-Au démarrage : mode Décennies, A = **2000–2009**, B = **2020–2024** (81 titres).
+Au démarrage : mode Décennies, période étudiée **2000–2009**, référence **2020–2024** (81 titres).
 Le menu propose séparément **2020–janv. 2025** (82 titres), ainsi que des
 intervalles personnalisés pouvant isoler 2025. Les réglages des deux modes sont
 indépendants et persistants. 1958 et 2025 sont partielles. Les chevauchements et
@@ -24,7 +24,7 @@ les périodes identiques sont signalés près des sélecteurs.
 Discogs est la seule classification des genres. `cdr_genre`, absent de la
 période récente, n’est jamais utilisé en complément. Un genre renseigné exclut
 les lignes sans genre. « Non renseigné » permet de les examiner ; ce n’est pas
-un genre musical. Le filtre est identique pour A, B et les courbes.
+un genre musical. Le filtre est identique pour les deux périodes et les courbes.
 Sur 2020–2024 sans filtre : 65/81 genres renseignés, 16 manquants (19,8 %).
 Cette couverture est recalculée avec les sélections.
 
@@ -37,7 +37,7 @@ une sélection vide aussi. Un zéro connu reste zéro. Aucun delta n’est calcu
 si un côté est indisponible. Le seuil de prudence de moins de 10 titres ou
 valeurs exploitables est un repère d’affichage, aucune garantie au-delà.
 
-Les variations de parts sont exprimées en **points de pourcentage** (B − A).
+Les variations de parts sont exprimées en **points de pourcentage** (référence − période étudiée).
 Aucune variation relative n’est affichée : pas de division par une base nulle.
 Les constats textuels sont déterministes et recalculés après chaque filtre.
 
@@ -46,7 +46,7 @@ la partition des origines sont exclusifs et totalisent 100 %, inconnus inclus.
 Le top 9 des genres et le top 10 des pays sont classés selon la **moyenne des
 parts des périodes disponibles**, avec poids égaux. Catégorie absente d’une
 période non vide : zéro ; période vide : aucun poids. Égalité : ordre alphabétique.
-Une même liste et un même ordre servent à A/B. « Non renseigné » est ajouté aux
+Une même liste et un même ordre servent aux deux périodes. « Non renseigné » est ajouté aux
 genres, hors du top 9 ; les autres catégories restent dans Détails et les filtres.
 
 ## Courbes et distributions
@@ -54,7 +54,7 @@ genres, hors du top 9 ; les autres catégories restent dans Détails et les filt
 Chaque point résume les titres de la **période explicitement inscrite sur l’axe**,
 avec le genre actif : 1958–1959, 1960–1969, …, 2020–janv. 2025. Il n’est pas une
 observation de l’année 1950 ou 2020. Les points sont placés au milieu de leur
-intervalle. Les cartes A/B décrivent les intervalles choisis, même s’ils coupent
+intervalle. Les cartes de comparaison décrivent les intervalles choisis, même s’ils coupent
 ces périodes : aucun aplat ne suggère leur équivalence avec une décennie.
 
 La médiane partage les valeurs en deux moitiés. Q1–Q3 contient leur moitié
@@ -70,7 +70,7 @@ La bande Q1–Q3 et la courbe sont interrompues lorsqu’une période n’a pas 
 valeur exploitable. Les équipes proposent trois indicateurs temporels
 (auteurs tous crédits, hors samples/interpolations, producteurs). Les pratiques
 proposent sample, interpolation ou reprise, sur tous les titres de la décennie.
-Les distributions A/B restent accessibles dans la même section.
+Les distributions des deux périodes restent accessibles dans la même section.
 
 ## Artistes, collaborations, crédits
 
@@ -112,7 +112,7 @@ reste séparé sur la carte et dans la comparaison par territoire. Origines mixt
 au moins une origine américaine (Porto Rico inclus) et une autre ; non classable :
 aucune origine exploitable.
 
-Carte : gamme séquentielle, borne commune A/B. Pays documenté mais absent d’une
+Carte : gamme séquentielle, borne commune aux deux périodes. Pays documenté mais absent d’une
 sélection renseignée : zéro. Pays non documenté dans le corpus ou sélection sans
 origine exploitable : sans donnée, gris. Les repères de petites îles et le
 sélecteur permettent de retrouver Porto Rico, la Barbade et Trinité-et-Tobago.
@@ -125,7 +125,7 @@ ouvert : aucune décision de retrait confirmée dans le document consulté.
 
 ## Accès aux titres et export
 
-Chaque analyse offre une sélection A/B contextuelle, avec recherche titre/artiste.
+Chaque analyse offre une sélection contextuelle par période, avec recherche titre/artiste.
 Les mesures numériques permettent trois titres distincts proches de Q1,
 médiane, Q3. Les cibles sont calculées sur la sélection courante (après recherche
 si utilisée). En cas d’égalité : date, titre, artiste. Moins de trois valeurs
@@ -141,10 +141,10 @@ force pas un débordement de la page sur mobile.
 
 ## Présentation
 
-A bleu, B ambre, ordre constant. Empilements : palette catégorielle et texte
-sombre ; contraste minimal mesuré 4,68:1. Les barres partent de zéro, les
+Période étudiée violette, référence bleu-vert, ordre constant. Empilements : palette catégorielle et texte
+blanc sur les aplats de couleur. Les barres partent de zéro, les
 compositions restent sur 0–100 %. Les points conservent une échelle complète,
-et les axes des mesures gardent leurs unités. Les symboles et libellés A/B
+et les axes des mesures gardent leurs unités. Les symboles et dates des périodes
 maintiennent une lecture indépendante de la couleur.
 
 Les options « Situer mon morceau », assistant IA, radar et jauge restent

@@ -13,7 +13,7 @@ from collaboration_rules import qualify_credits
 from dashboard_data import CREDITS, REUSE, comparison_rows, decades, overlap_message, ranked_categories
 from charts import binary_frame, share_frame, stacked, trend, distribution
 from ui import metric_message, representative_titles, selection_table
-from test_regression import ROOT, ROUTES, title_rows, TableParser
+from test_regression import go_to, ROOT, ROUTES, title_rows, TableParser
 
 
 class Corrections(unittest.TestCase):
@@ -170,17 +170,17 @@ class NewJourneys(unittest.TestCase):
     def setUp(self):
         self.app=AppTest.from_file(str(ROOT/'app.py')).run(timeout=30)
     def go(self,route):
-        self.app.button(key='nav_'+route).click().run()
+        go_to(self.app, route)
         self.assertFalse(self.app.exception,[e.message for e in self.app.exception])
 
     def test_country_comparisons_small_territory_and_empty_b(self):
         self.go('map')
-        self.app.radio(key='country_view').set_value('Comparaison A/B').run()
+        self.app.radio(key='country_view').set_value('Comparaison des périodes').run()
         self.app.selectbox(key='map_country').set_value('Porto Rico').run()
         self.assertFalse(self.app.exception)
         self.assertIn('Porto Rico',' '.join(c.value for c in self.app.caption))
         self.go('intro'); self.go('map')
-        self.assertEqual(self.app.radio(key='country_view').value,'Comparaison A/B')
+        self.assertEqual(self.app.radio(key='country_view').value,'Comparaison des périodes')
         self.assertEqual(self.app.selectbox(key='map_country').value,'Porto Rico')
         self.app.radio(key='mode').set_value('Intervalles d’années').run()
         self.app.slider(key='years_b').set_value((1958,1959)).run()
@@ -203,7 +203,7 @@ class NewJourneys(unittest.TestCase):
             self.assertEqual(self.app.selectbox(key=selector).value,options[-1])
         for route in ['formats','origins']:
             self.go(route)
-            self.app.radio(key='composition_'+route).set_value('Comparaison A/B').run()
+            self.app.radio(key='composition_'+route).set_value('Comparaison des périodes').run()
             self.assertFalse(self.app.exception)
 
     def test_ar_scenario_context_csv_and_overlap_warning(self):
