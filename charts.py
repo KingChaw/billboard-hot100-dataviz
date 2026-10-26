@@ -15,8 +15,8 @@ from periods import period_labels
 
 PERIODS = list(COLORS)
 CATEGORY_COLORS = {
-    "Uniquement États-Unis": "#4266A8", "Mixte": "#92609D",
-    "Uniquement hors États-Unis": "#287C6C", "Non classable": "#626D7D",
+    "Uniquement États-Unis": "#5C1F3E", "Mixte": "#A85C85",
+    "Uniquement hors États-Unis": "#E0BACE", "Non classable": "#B9BEC8",
     "Groupe": "#4266A8", "Duo": "#92609D", "Solo": "#287C6C", "Non renseigné": "#626D7D",
     "Duo ou groupe constitué": "#4266A8", "Featuring": "#92609D", "Co-signature": "#B8642E",
 }
@@ -225,6 +225,10 @@ def points(data, frames, order, y_title=None):
     fig.update_layout(margin_t=60, legend=dict(y=1.12, x=.5, xanchor="center"))
     return fig
 
+def readable_text(color):
+    """Texte foncé sur fond clair, blanc sur fond sombre."""
+    r, g, b = (int(color[i:i + 2], 16) / 255 for i in (1, 3, 5))
+    return "#242631" if 0.2126 * r + 0.7152 * g + 0.0722 * b > .5 else "#FFFFFF"
 
 def stacked(frames, column, order, vertical=False):
     labels = period_labels(frames)
@@ -241,7 +245,8 @@ def stacked(frames, column, order, vertical=False):
         fig.add_trace(go.Bar(**position, name=category, width=.5,
                             marker_color=CATEGORY_COLORS[category], customdata=[[*count, labels[p]] for count, p in zip(counts, PERIODS)],
                             text=[f"{v:.1f} %".replace(".", ",") if pd.notna(v) and v > 0 else "" for v in shares],
-                            textposition="inside", insidetextanchor="middle", textangle=0, textfont=dict(color="#FFFFFF", size=12),
+                            textposition="inside", insidetextanchor="middle", textangle=0,
+                            textfont=dict(color=readable_text(CATEGORY_COLORS[category]), size=12),
                             hovertemplate=category + " · %{customdata[2]}<br>%{" + ("y" if vertical else "x") + ":.1f} %<br>%{customdata[0]} / %{customdata[1]} titres<extra></extra>"))
     style(fig)
     fig.update_layout(barmode="stack", showlegend=False, margin_t=20, uniformtext=dict(minsize=11, mode="show"))
@@ -324,12 +329,34 @@ def world_map(data, period, selected_country=None, label=None):
     if selected_country:
         row = selected[selected.pays.eq(selected_country)].iloc[0]
         fig.add_trace(go.Scattergeo(locations=[row.iso], locationmode="ISO-3", mode="markers",
-                                     marker=dict(size=15, color="#A65313", symbol="circle-open", line_width=2),
-                                     showlegend=False, hoverinfo="skip"))
+                                    marker=dict(size=15, color="#A65313", symbol="circle-open", line_width=2),
+                                    showlegend=False, hoverinfo="skip"))
     style(fig)
     fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), geo=dict(
         projection_type="natural earth", bgcolor="#FFFFFF", showframe=False, showcoastlines=False,
         showland=True, landcolor="#DADBE2", showcountries=True, countrycolor="#FFFFFF"))
     if selected.part.notna().sum() == 0:
         empty_note(fig, "Aucune origine exploitable pour cette période")
+    return fig
+
+def origins_trend(series, height=430):
+    """Les trois parts exclusives sur une même frise ; leur comparaison est le message."""
+    fig = go.Figure()
+    for label, data in series:
+        fig.add_trace(go.Scatter(
+            x=data.position, y=data.value, mode="lines+markers", name=label,
+            line=dict(color=CATEGORY_COLORS[label], width=2.5),
+            marker=dict(size=9, symbol=["circle-open" if p else "circle" for p in data.partial]),
+            connectgaps=False, customdata=data[["label", "valid", "total"]],
+            hovertemplate=label + "<br>%{customdata[0]}<br>%{y:.1f} %"
+                        + "<br>Valeurs exploitables : %{customdata[1]} / %{customdata[2]}<extra></extra>"))
+    style(fig, height)
+    fig.update_layout(showlegend=False)
+    axis = series[0][1]
+    fig.update_xaxes(title="Périodes agrégées", tickmode="array", tickvals=axis.position,
+                    ticktext=axis.label, tickangle=-30,
+                    range=[axis.position.min() - 3, axis.position.max() + 3],
+                    showgrid=True, gridcolor="#ECECF1")
+    fig.update_layout(margin_b=85)
+    fig.update_yaxes(title="Part des titres n°1 (%)", range=[0, 100], ticksuffix=" %", dtick=25)
     return fig

@@ -7,7 +7,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from analysis import DATA, prepare, select
-from charts import bars, binary_frame, distribution, points, render, share_frame, stacked, trend, world_map
+from charts import bars, binary_frame, distribution, origins_trend, points, render, share_frame, stacked, trend, world_map
 from dashboard_data import (AXES, METRICS, ORIGINS, ORIGIN_HELP, CREDITS, REUSE, 
                             country_frame, decades, overlap_message, ranked_categories, comparison_rows)
 from periods import date_label, period_labels, display_comparison
@@ -267,6 +267,23 @@ def temporal_table(data):
     st.dataframe(data[keep].rename(columns={"label": "Période couverte", "value": "Médiane / part (%)", "q1": "Q1", "q3": "Q3",
                                           "count": "Titres concernés", "valid": "Exploitables", "total": "Titres", "partial": "Partielle"}), hide_index=True, width="stretch")
 
+def origins_headline(series):
+    """Première et dernière période complète ; la plus forte baisse et la plus forte hausse."""
+    moves = []
+    for label, data in series:
+        known = data[data.value.notna() & ~data.partial.astype(bool)]
+        if len(known) < 2:
+            continue
+        start, end = known.iloc[0], known.iloc[-1]
+        moves.append((label, start.label, start.value, end.label, end.value, end.value - start.value))
+    if not moves:
+        return "Évolution indisponible : aucune période complète ne comporte d’origine exploitable."
+    drop, rise = min(moves, key=lambda m: m[5]), max(moves, key=lambda m: m[5])
+    retained = (drop, rise) if drop[0] != rise[0] else (drop,)
+    phrases = [f"« {label} » passe de {number(v0)} % sur {d0} à {number(v1)} % sur {d1} "
+            f"({'+' if delta > 0 else ''}{number(delta)} points)"
+            for label, d0, v0, d1, v1, delta in retained]
+    return "Entre les périodes complètes, " + ", et ".join(phrases) + "."
 
 if route == "summary":
     # Parcours de chaque onglet en tête ; les anciens repères chiffrés restent en bas pour mémoire.
@@ -331,19 +348,29 @@ elif route in ("format_trend", "origin_trend"):
         numeric_summary(frames, metric, label, unit)
         data = decades(filtered, column=metric, coverage=(first, last))
         median = True
-    else:
-        metric = st.selectbox("Composition", list(ORIGINS)[:3], format_func=ORIGINS.get, key="origin_metric")
-        kpi_cards([share_card(frames, ORIGINS[metric], lambda d: d.origin_group.eq(metric), lambda d: d.origins.map(bool))], frames)
-        data = decades(filtered, origin=metric, coverage=(first, last))
-        unit, median = "%", False
-    trend_notes(data)
-    render(trend(data, unit, years_a, years_b, median=median), route)
-    if median:
+        trend_notes(data)
+        render(trend(data, unit, years_a, years_b, median=median), route)
         st.caption(BOX_NOTE)
-    with detail_block(notes=[BOX_NOTE if median else ORIGIN_HELP[ORIGINS[metric]]]):
-        if median:
+        with detail_block(notes=[BOX_NOTE]):
             numeric_table(frames, metric, unit)
-        temporal_table(data)
+            temporal_table(data)
+    else:
+        series = [(ORIGINS[key], decades(filtered, origin=key, coverage=(first, last))) for key in list(ORIGINS)[:3]]
+        st.write(origins_headline(series))
+        category_legend([label for label, _ in series], ORIGIN_HELP)
+        render(origins_trend(series), route, height=500)
+        st.markdown("""
+**Comment lire** · une courbe par catégorie, chaque titre comptant dans une seule d'entre elles.
+Les trois parts couvrent tous les titres dont l'origine est renseignée.
+- **Les cercles ouverts** signalent une période incomplète.
+- **Une courbe interrompue** signale une période sans origine exploitable.
+- Ce qui compte n'est pas le niveau d'une courbe, mais **l'écart entre les trois**.
+""")
+        trend_notes(series[0][1])
+        with detail_block(notes=[ORIGIN_NOTE, "Une période sans origine exploitable n'est pas reliée."], essentials=True):
+            for label, data in series:
+                st.markdown(f"**{label}**")
+                temporal_table(data)
 
 elif route in ("ages", "teams"):
     # Profils et création : KPI A/B compact puis graphique. Le reste va dans Détails.
@@ -483,56 +510,65 @@ elif route in ("central", "presence", "genres"):
 
 elif route == "origins":
     column, order = "origin_group", list(ORIGINS.values())
-    notes = [ORIGIN_NOTE, "Une seule catégorie par titre, y compris les non classables."]
-    category_legend(order, ORIGIN_HELP)
-    coverage_note(frames, list_column="origins", label="Origines exploitables")
-    view = st.radio("Lecture de la composition", ["Composition à 100 %", "Comparaison des périodes"], horizontal=True, key=f"composition_{route}")
+    if not any(d.origin_group.eq("Non classable").any() for d in frames.values()):
+        order = order[:3]
     data = share_frame(frames, column)
     data["catégorie"] = data["catégorie"].replace(ORIGINS)
     st.write(category_message(data, frames, order))
-    if view == "Composition à 100 %":
-        render(stacked(frames, column, order), route)
-        st.caption("Chaque barre représente tous les titres d’une période. Pour comparer précisément chaque catégorie, choisir « Comparaison des périodes ».")
-    else:
-        render(points(data, frames, order), route)
-        shares_summary(data, frames, order)
-    with st.expander("Complément proposé · paroles non anglaises"):
-        st.caption("Réintégration proposée, arbitrage collectif ouvert : le cadrage conserve cet indicateur. Il ne précise pas la langue ; origine et langue sont distinctes.")
-        kpi_cards([share_card(frames, "Présence de paroles non anglaises", lambda d: d.foreign_language.eq(1), lambda d: d.foreign_language.notna())], frames)
-        st.caption("Peu de titres concernés : éviter les conclusions générales sur les langues.")
-        for period, d in frames.items():
-            st.caption(labels[period] + " · croisement descriptif avec les origines")
-            st.dataframe(d.assign(présence=d.foreign_language.map({0: "Non", 1: "Oui"}).fillna("Non renseigné"))
-                         .groupby(["origin_group", "présence"]).size().rename("Titres").rename_axis(["Origines", "Paroles non anglaises"]), width="stretch")
-    with detail_block(notes=notes):
-        st.dataframe(display_comparison(comparison_rows(data, frames, order), frames), hide_index=True, width="stretch")
+    category_legend(order, ORIGIN_HELP)
+    render(stacked(frames, column, order), route)
+    st.markdown("""
+**Comment lire les barres** · une barre par période, chacune représentant tous ses titres.
+- **Uniquement États-Unis** : toutes les origines associées au titre sont américaines.
+- **Mixte** : au moins une origine américaine et au moins une étrangère sur le même titre.
+- **Uniquement hors États-Unis** : aucune origine américaine.
 
+Chaque titre figure dans une seule catégorie : les trois parts couvrent tous les titres dont l'origine est renseignée.
+""")
+    coverage_note(frames, list_column="origins", label="Origines exploitables")
+    with detail_block(notes=[ORIGIN_NOTE, "Une seule catégorie par titre."], essentials=True):
+        st.dataframe(display_comparison(comparison_rows(data, frames, order), frames),
+                    hide_index=True, width="stretch")
+        st.markdown("**Paroles non anglaises**")
+        st.caption("Indicateur conservé au cadrage. Il ne précise pas la langue ; origine et langue sont distinctes. "
+                "22 titres concernés sur tout le fichier : aucune conclusion générale possible.")
+        kpi_cards([share_card(frames, "Présence de paroles non anglaises", lambda d: d.foreign_language.eq(1), lambda d: d.foreign_language.notna())], frames)
+        
 elif route == "map":
     data = country_frame(frames, all_data)
-    view = st.radio("Lecture des pays", ["Carte", "Comparaison des périodes"], horizontal=True, key="country_view")
-    country = st.selectbox("Retrouver un pays ou territoire", ["Tous"] + sorted(data.pays.unique()), key="map_country")
-    coverage_note(frames, list_column="origins", label="Origines exploitables")
-    st.caption("Pays associés / tous les titres filtrés. Un titre peut compter dans plusieurs pays ; origine, nationalité, langue et marché sont distincts.")
     comparisons = data.rename(columns={"pays": "catégorie"})
-    st.write(category_message(comparisons, frames, [country] if country != "Tous" else ranked_categories(comparisons, limit=10, missing=None)))
+    country = st.session_state.get("map_country", "Tous")
+    order = [country] if country != "Tous" else ranked_categories(comparisons, limit=10, missing=None)
+    st.write(category_message(comparisons, frames, order))
+    view = st.radio("Lecture des pays", ["Comparaison des périodes", "Carte"], horizontal=True, key="country_view")
     if view == "Carte":
         period = st.radio("Période affichée", list(frames), format_func=labels.get, horizontal=True, key="map_period")
-        st.caption("Violet très clair : 0 % · Gris : absence de données · Échelle commune aux deux périodes")
         render(world_map(data, period, None if country == "Tous" else country, label=labels[period]), route)
-    else:
-        order = [country] if country != "Tous" else ranked_categories(comparisons, limit=10, missing=None)
-        st.caption("10 pays selon la moyenne des parts des deux périodes, à poids égaux. Le sélecteur et Détails donnent accès à tous les territoires.")
-        render(bars(comparisons, frames, order), route)
-    if country != "Tous":
-        rows = data[data.pays.eq(country)]
-        for r in rows.itertuples():
-            st.caption(f"{labels[r.période]} · {country} : {number(r.part)} % · {r.effectif}/{r.total} titres" if pd.notna(r.part) else f"{labels[r.période]} · {country} : non disponible")
+        st.markdown("**Comment lire la carte** · plus un pays est foncé, plus il est associé à de titres n°1. "
+                    "Violet très clair : 0 %. Gris : pays jamais documenté dans le fichier. "
+                    "L’échelle est commune aux deux périodes, donc les cartes sont comparables entre elles.")
+    elif country != "Tous":
+        # Une seule catégorie ne fait pas un graphique : deux chiffres suffisent.
+        rows = data[data.pays.eq(country)].set_index("période").reindex(list(frames))
+        kpi_cards([(f"{country} · part des titres n°1",
+                    [f"{number(r.part)} % ({int(r.effectif)}/{int(r.total)} titres)" if pd.notna(r.part) else "Non disponible"
+                    for r in rows.itertuples()], None)], frames, compact=True)
         shares_summary(comparisons, frames, [country])
-    with detail_block(notes=[ORIGIN_NOTE, "Un pays documenté mais absent de la sélection vaut zéro. Gris : pays non documenté ou aucune origine exploitable.",
-                             "« Unites States » est normalisé en United States. « Columbia » est normalisé en Colombia sur le titre We Don't Talk About Bruno : correction étayée par les biographies Disney du casting, sans vérification exhaustive de chaque origine du casting.",
-                             "Carte : localiser ; barres à base commune : comparer. Les petites îles restent accessibles par repère et sélecteur."]):
-        st.dataframe(display_comparison(comparison_rows(comparisons, frames, sorted(data.pays.unique())), frames), hide_index=True, width="stretch")
+    else:
+        render(bars(comparisons, frames, order), route)
+        st.markdown("**Comment lire les barres** · les dix pays les plus représentés, classés sur la moyenne "
+                    "des deux périodes à poids égaux. Un titre peut être associé à plusieurs pays : "
+                    "le total dépasse donc 100 %.")
+    st.selectbox("Retrouver un pays ou territoire", ["Tous"] + sorted(data.pays.unique()), key="map_country")
+    with detail_block(notes=[ORIGIN_NOTE,
+                        "Un titre peut être associé à plusieurs pays : le total dépasse 100 %. Un pays documenté mais absent de la sélection vaut zéro ; le gris signale un pays non documenté.",
+                        "« Unites States » est normalisé en United States. « Columbia » est normalisé en Colombia sur le titre We Don't Talk About Bruno : correction étayée par les biographies Disney du casting, sans vérification exhaustive de chaque origine du casting."],
+                    essentials=True):
+        coverage_note(frames, list_column="origins", label="Origines exploitables")
+        st.dataframe(display_comparison(comparison_rows(comparisons, frames, sorted(data.pays.unique())), frames),
+                    hide_index=True, width="stretch")
 
+        
 elif route in ("data_a", "data_b"):
     period = "Période A" if route == "data_a" else "Référence B"
     data = frames[period].sort_values(["date", "song", "artist"], kind="stable")
