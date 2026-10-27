@@ -7,8 +7,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from analysis import DATA, prepare, select
-from charts import bars, binary_frame, distribution, origins_trend, points, render, share_frame, stacked, trend, world_map
-from dashboard_data import (AXES, METRICS, ORIGINS, ORIGIN_HELP, CREDITS, REUSE, 
+from charts import bars, binary_frame, distribution, origins_trend, points, render, share_frame, stacked, trend
+from dashboard_data import (AXES, METRICS, ORIGINS, ORIGIN_HELP, CREDITS, REUSE,
                             country_frame, decades, overlap_message, ranked_categories, comparison_rows)
 from periods import date_label, period_labels, display_comparison
 from theme import apply_theme
@@ -27,8 +27,10 @@ def load(source_version):
 
 
 try:
+    # Lu une seule fois : field_values() le réutilise au lieu de relire l'horodatage.
+    SOURCE_VERSION = DATA.stat().st_mtime_ns
     # Invalider aussi les données préparées lorsque les règles de crédit évoluent.
-    all_data = load((DATA.stat().st_mtime_ns, (DATA.parent.parent / "analysis.py").stat().st_mtime_ns,
+    all_data = load((SOURCE_VERSION, (DATA.parent.parent / "analysis.py").stat().st_mtime_ns,
                      (DATA.parent.parent / "collaboration_rules.py").stat().st_mtime_ns))
 except (FileNotFoundError, ValueError, KeyError) as exc:
     st.error(f"Lecture impossible de data/billboard.csv : {exc}")
@@ -54,23 +56,27 @@ NAV = {
     "Format & son": [("format_trend", "Évolution musicale"), ("duration", "Durée des titres"),
                          ("intro", "Durée des introductions"), ("sound", "Caractéristiques sonores"),
                          ("central", "Rôle central"), ("presence", "Présence de sections"), ("genres", "Genres")],
-    "Origines des artistes": [("origin_trend", "Évolution des origines"), ("origins", "Composition des origines"),
-                                 ("map", "Pays et territoires")],
+    "Origines des artistes": [("origins", "Composition et évolution"), ("map", "Pays et territoires")],
     "Profils et création": [("ages", "Âge"), ("formats", "Seul ou à plusieurs"), ("teams", "Équipes"),
                                ("reuse", "Samples et reprises")],
     "Données": [("data_a", "Titres de la période étudiée"), ("data_b", "Titres de la période de référence")],
 }
 TITLES = {route: label for entries in NAV.values() for route, label in entries}
 TITLES.update(summary="Quels repères offrent les titres n°1 ?", format_trend="Comment les caractéristiques musicales évoluent-elles ?",
-              origin_trend="Comment les origines associées aux n°1 évoluent-elles ?",
               duration="Comment la durée des titres varie-t-elle ?", intro="Comment la durée des introductions varie-t-elle ?",
               sound="Comment le profil sonore varie-t-il ?", ages="À quel âge les artistes décrochent-ils un n°1 ?",
               teams="Combien de personnes faut-il pour écrire et produire un n°1 ?",
               reuse="Les n°1 s’appuient-ils davantage sur des morceaux existants ?",
               central="Quels instruments structurent les titres n°1 ?", presence="Quelles sections instrumentales sont présentes ?",
-              genres="Quels genres sont associés aux titres n°1 ?", origins="Comment se répartissent les origines ?",
+              genres="Quels genres sont associés aux titres n°1 ?",
+              origins="Comment se répartissent les origines, et comment évoluent-elles ?",
               formats="Seul ou à plusieurs : comment se fait un n°1 ?",
- map="Quels pays et territoires sont associés aux n°1 ?")
+              map="Quels pays et territoires sont associés aux n°1 ?")
+
+# Une route supprimée depuis l’ouverture de la session y subsiste : navigation() échouerait.
+if st.session_state.route not in TITLES:
+    st.session_state.route = "summary"
+    st.session_state.pop("last_routes", None)
 
 
 def navigate(route):
@@ -185,10 +191,18 @@ if any(y[0] <= 1958 <= y[1] for y in (years_a, years_b)):
 AGE_NOTE = "Âge du frontperson ou chef de groupe, éventuellement moyenne s’ils sont plusieurs. Ce n’est ni l’âge individuel de tous les membres, ni nécessairement celui du chanteur principal. Les décimales sont conservées."
 CREDIT_NOTE = "Personnes distinctes par titre : noms séparés par « ; », espaces et casse harmonisés, puis déduplication. « Unknown » est une information manquante."
 ORIGIN_NOTE = "Origines = pays de naissance renseignés, distincts de la nationalité, de la langue ou du marché. Porto Rico est regroupé avec les États-Unis pour la composition, et reste distinct sur la carte."
+# Définitions reprises dans Détails depuis ORIGIN_HELP, avec repli littéral.
+ORIGIN_FALLBACK = {"Uniquement États-Unis": "toutes les origines renseignées du titre sont américaines",
+                   "Mixte": "au moins une origine américaine et au moins une origine étrangère sur le même titre",
+                   "Uniquement hors États-Unis": "aucune origine américaine renseignée"}
+ORIGIN_CATEGORIES = [f"{label} : {text}" for label in list(ORIGINS.values())[:3]
+                     if (text := ORIGIN_HELP.get(label) or ORIGIN_FALLBACK.get(label))] + [
+    "Un titre figure dans une seule catégorie ; les trois parts couvrent donc tous les titres dont l’origine est renseignée."]
 BASED = {"guitar_based": "Guitare centrale", "piano_keyboard_based": "Piano/claviers centraux", "vocally_based": "Voix centrale", "bass_based": "Basse centrale"}
 PRESENT = {"orchestral_strings": "Cordes présentes", "horns_winds": "Cuivres/vents présents"}
 BOX_NOTE = "La médiane partage les valeurs en deux moitiés. Q1–Q3 contient la moitié centrale des valeurs ; ce n’est pas un intervalle de confiance."
 TREND_NOTE = "Courbe : périodes indiquées sur l’axe. Cartes de comparaison : vos intervalles exacts, parfois différents des décennies. Même filtre de genre."
+PARTIAL_NOTE = "Cercles ouverts : couverture partielle. 1958 débute le 4 août ; 2025 s’arrête au 11 janvier. L’agrégat 2020–janv. 2025 diffère de la référence 2020–2024."
 filtered = select(all_data, (first, last), genre)
 
 
@@ -197,7 +211,6 @@ SOURCES = {
     "duration": ["length_sec"], "intro": ["intro_length_sec"],
     "central": ["guitar_based", "piano_keyboard_based", "vocally_based", "bass_based"],
     "presence": ["orchestral_strings", "horns_winds"], "genres": ["discogs_genre"],
-    "origin_trend": ["artist_place_of_origin"], "origins": ["artist_place_of_origin", "foreign_language"],
     "map": ["artist_place_of_origin"], "ages": ["front_person_age", "discogs_genre"],
     "formats": ["artist", "artist_structure"], "reuse": ["sample", "interpolation", "cover"],
 }
@@ -210,6 +223,11 @@ def sources(route):
         return ["producers" if st.session_state.get("team_role") == "Producteurs" else "songwriters_w_o_interpolation_sample_credits"]
     if route == "format_trend":
         return [st.session_state.get("evolution_metric", "length_sec")]
+    if route == "origins":
+        # La vue chronologique n'utilise pas la langue des paroles.
+        if st.session_state.get("origins_view", "Évolution") == "Évolution":
+            return ["artist_place_of_origin"]
+        return ["artist_place_of_origin", "foreign_language"]
     return SOURCES.get(route, [])
 
 
@@ -229,7 +247,7 @@ def field_values(column):
         "songwriters_w_o_interpolation_sample_credits": "noms séparés par « ; », sans les auteurs crédités au titre d’un sample ou d’une interpolation",
         "producers": "noms séparés par « ; »",
     }
-    values = raw_data(DATA.stat().st_mtime_ns)[column]
+    values = raw_data(SOURCE_VERSION)[column]
     known = values.dropna()
     if column in described:
         text = described[column]
@@ -251,9 +269,11 @@ def detail_block(columns=None, notes=(), essentials=False):
     return details(frames, all_data, genre, columns, notes, essentials, footer=source_note)
 
 
-def trend_notes(data):
-    st.caption(TREND_NOTE)
-    st.caption("Cercles ouverts : couverture partielle. 1958 débute le 4 août ; 2025 s’arrête au 11 janvier. L’agrégat 2020–janv. 2025 diffère de la référence 2020–2024.")
+def trend_notes(data, captions=True):
+    """Alertes de fiabilité toujours visibles ; notes de méthode optionnelles."""
+    if captions:
+        st.caption(TREND_NOTE)
+        st.caption(PARTIAL_NOTE)
     small = data[(data.valid > 0) & (data.valid < 10)]
     if len(small):
         st.warning("Moins de 10 valeurs exploitables : " + ", ".join(f"{r.label} ({r.valid}/{r.total})" for r in small.itertuples()) + ". Prudence.")
@@ -267,23 +287,6 @@ def temporal_table(data):
     st.dataframe(data[keep].rename(columns={"label": "Période couverte", "value": "Médiane / part (%)", "q1": "Q1", "q3": "Q3",
                                           "count": "Titres concernés", "valid": "Exploitables", "total": "Titres", "partial": "Partielle"}), hide_index=True, width="stretch")
 
-def origins_headline(series):
-    """Première et dernière période complète ; la plus forte baisse et la plus forte hausse."""
-    moves = []
-    for label, data in series:
-        known = data[data.value.notna() & ~data.partial.astype(bool)]
-        if len(known) < 2:
-            continue
-        start, end = known.iloc[0], known.iloc[-1]
-        moves.append((label, start.label, start.value, end.label, end.value, end.value - start.value))
-    if not moves:
-        return "Évolution indisponible : aucune période complète ne comporte d’origine exploitable."
-    drop, rise = min(moves, key=lambda m: m[5]), max(moves, key=lambda m: m[5])
-    retained = (drop, rise) if drop[0] != rise[0] else (drop,)
-    phrases = [f"« {label} » passe de {number(v0)} % sur {d0} à {number(v1)} % sur {d1} "
-            f"({'+' if delta > 0 else ''}{number(delta)} points)"
-            for label, d0, v0, d1, v1, delta in retained]
-    return "Entre les périodes complètes, " + ", et ".join(phrases) + "."
 
 if route == "summary":
     # Parcours de chaque onglet en tête ; les anciens repères chiffrés restent en bas pour mémoire.
@@ -297,9 +300,8 @@ if route == "summary":
         ("Présence de sections", "Des cordes ou des cuivres ?"),
         ("Genres", "Dans quels genres se rangent les n°1 ?")])
     st.subheader("2 · D’où viennent les artistes associés aux n°1 ?")
-    journey("Origines des artistes · de la tendance au pays", [
-        ("Évolution des origines", "La part d’artistes non américains a-t-elle bougé ?"),
-        ("Composition des origines", "Américains, mixtes ou hors États-Unis ?"),
+    journey("Origines des artistes · de la composition au pays", [
+        ("Composition et évolution", "Américains, mixtes ou hors États-Unis ? Et comment ça bouge ?"),
         ("Pays et territoires", "De quels pays viennent les artistes ?")])
     st.subheader("3 · Comment les profils et les modes de création évoluent-ils ?")
     journey("Profils et création · de l’artiste aux coulisses du morceau", [
@@ -322,11 +324,13 @@ if route == "summary":
     with right:
         shortcut("Voir la durée des introductions", "intro")
     st.markdown("**2 · Origines**")
-    kpi_cards([share_card(frames, "Uniquement États-Unis", lambda d: d.origin_group.eq(next(iter(ORIGINS))), lambda d: d.origins.map(bool)),
-               share_card(frames, "Uniquement hors États-Unis", lambda d: d.origin_group.eq("Hors États-Unis uniquement"), lambda d: d.origins.map(bool))], frames)
+    # ORIGINS : clés = valeurs brutes de origin_group, valeurs = libellés affichés.
+    us_only, non_us_only = list(ORIGINS)[0], list(ORIGINS)[2]
+    kpi_cards([share_card(frames, ORIGINS[us_only], lambda d: d.origin_group.eq(us_only), lambda d: d.origins.map(bool)),
+               share_card(frames, ORIGINS[non_us_only], lambda d: d.origin_group.eq(non_us_only), lambda d: d.origins.map(bool))], frames)
     left, right = st.columns(2)
     with left:
-        shortcut("Voir la composition des origines", "origins")
+        shortcut("Voir la composition et l’évolution", "origins")
     with right:
         shortcut("Comparer les pays et territoires", "map")
     st.markdown("**3 · Profils et création**")
@@ -341,36 +345,17 @@ if route == "summary":
     with detail_block(notes=[AGE_NOTE, CREDIT_NOTE, ORIGIN_NOTE]):
         pass
 
-elif route in ("format_trend", "origin_trend"):
-    if route == "format_trend":
-        metric = st.selectbox("Indicateur", list(METRICS), format_func=lambda c: METRICS[c][0], key="evolution_metric")
-        label, unit = METRICS[metric]
-        numeric_summary(frames, metric, label, unit)
-        data = decades(filtered, column=metric, coverage=(first, last))
-        median = True
-        trend_notes(data)
-        render(trend(data, unit, years_a, years_b, median=median), route)
-        st.caption(BOX_NOTE)
-        with detail_block(notes=[BOX_NOTE]):
-            numeric_table(frames, metric, unit)
-            temporal_table(data)
-    else:
-        series = [(ORIGINS[key], decades(filtered, origin=key, coverage=(first, last))) for key in list(ORIGINS)[:3]]
-        st.write(origins_headline(series))
-        category_legend([label for label, _ in series], ORIGIN_HELP)
-        render(origins_trend(series), route, height=500)
-        st.markdown("""
-**Comment lire** · une courbe par catégorie, chaque titre comptant dans une seule d'entre elles.
-Les trois parts couvrent tous les titres dont l'origine est renseignée.
-- **Les cercles ouverts** signalent une période incomplète.
-- **Une courbe interrompue** signale une période sans origine exploitable.
-- Ce qui compte n'est pas le niveau d'une courbe, mais **l'écart entre les trois**.
-""")
-        trend_notes(series[0][1])
-        with detail_block(notes=[ORIGIN_NOTE, "Une période sans origine exploitable n'est pas reliée."], essentials=True):
-            for label, data in series:
-                st.markdown(f"**{label}**")
-                temporal_table(data)
+elif route == "format_trend":
+    metric = st.selectbox("Indicateur", list(METRICS), format_func=lambda c: METRICS[c][0], key="evolution_metric")
+    label, unit = METRICS[metric]
+    numeric_summary(frames, metric, label, unit)
+    data = decades(filtered, column=metric, coverage=(first, last))
+    trend_notes(data)
+    render(trend(data, unit, years_a, years_b, median=True), route)
+    st.caption(BOX_NOTE)
+    with detail_block(notes=[BOX_NOTE]):
+        numeric_table(frames, metric, unit)
+        temporal_table(data)
 
 elif route in ("ages", "teams"):
     # Profils et création : KPI A/B compact puis graphique. Le reste va dans Détails.
@@ -510,44 +495,62 @@ elif route in ("central", "presence", "genres"):
 
 elif route == "origins":
     column, order = "origin_group", list(ORIGINS.values())
-    if not any(d.origin_group.eq("Non classable").any() for d in frames.values()):
-        order = order[:3]
-    data = share_frame(frames, column)
-    data["catégorie"] = data["catégorie"].replace(ORIGINS)
-    st.write(category_message(data, frames, order))
+    # Clé brute retrouvée depuis le libellé : origin_group ne contient pas les libellés.
+    unclassified = next((key for key, label in ORIGINS.items() if label == "Non classable"), None)
+    if unclassified is None or not any(d.origin_group.eq(unclassified).any() for d in frames.values()):
+        order = [label for label in order if label != "Non classable"]
+    view = st.radio("Analyse des origines", ["Évolution", "Composition"],
+                    horizontal=True, key="origins_view", label_visibility="collapsed")
     category_legend(order, ORIGIN_HELP)
-    render(stacked(frames, column, order), route)
-    st.markdown("""
-**Comment lire les barres** · une barre par période, chacune représentant tous ses titres.
-- **Uniquement États-Unis** : toutes les origines associées au titre sont américaines.
-- **Mixte** : au moins une origine américaine et au moins une étrangère sur le même titre.
-- **Uniquement hors États-Unis** : aucune origine américaine.
-
-Chaque titre figure dans une seule catégorie : les trois parts couvrent tous les titres dont l'origine est renseignée.
+    if view == "Évolution":
+        series = [(ORIGINS[key], decades(filtered, origin=key, coverage=(first, last)))
+                  for key in list(ORIGINS)[:3]]
+        render(origins_trend(series), "origin_trend", height=480)
+        st.markdown("""
+**Comment lire** · une courbe par catégorie, chaque titre comptant dans une seule d'entre elles.
+- **Les cercles ouverts** signalent une période incomplète.
+- **Une courbe interrompue** signale une période sans origine exploitable.
+- Ce qui compte n'est pas le niveau d'une courbe, mais **l'écart entre les trois**.
 """)
-    coverage_note(frames, list_column="origins", label="Origines exploitables")
-    with detail_block(notes=[ORIGIN_NOTE, "Une seule catégorie par titre."], essentials=True):
-        st.dataframe(display_comparison(comparison_rows(data, frames, order), frames),
-                    hide_index=True, width="stretch")
-        st.markdown("**Paroles non anglaises**")
-        st.caption("Indicateur conservé au cadrage. Il ne précise pas la langue ; origine et langue sont distinctes. "
-                "22 titres concernés sur tout le fichier : aucune conclusion générale possible.")
-        kpi_cards([share_card(frames, "Présence de paroles non anglaises", lambda d: d.foreign_language.eq(1), lambda d: d.foreign_language.notna())], frames)
-        
+        # Une seule alerte, sur la borne basse des trois parts, appariée par libellé de période.
+        by_period = pd.concat([d.set_index("label").valid for _, d in series], axis=1).min(axis=1)
+        coverage = series[0][1].assign(valid=series[0][1].label.map(by_period)).dropna(subset=["valid"])
+        trend_notes(coverage.astype({"valid": int}), captions=False)
+    else:
+        data = share_frame(frames, column)
+        data["catégorie"] = data["catégorie"].replace(ORIGINS)
+        # Même hauteur que la courbe ; 480 px laissent son étiquette au segment à 5 %.
+        render(stacked(frames, column, order, vertical=True), "origins", height=480)
+        st.markdown("**Comment lire les barres** · une barre par période, représentant tous ses titres "
+                    "dont l’origine est renseignée. Les trois catégories sont exclusives : chaque titre "
+                    "figure dans une seule, et les trois parts couvrent donc l’ensemble. Leur définition "
+                    "exacte est dans la légende au-dessus, et dans Détails.")
+    if any(d.origins.map(bool).sum() < len(d) for d in frames.values()):
+        coverage_note(frames, list_column="origins", label="Origines exploitables")
+    with detail_block(notes=[ORIGIN_NOTE] + ([TREND_NOTE] if view == "Évolution" else ORIGIN_CATEGORIES),
+                      essentials=True):
+        if view == "Évolution":
+            for label, data in series:
+                st.markdown(f"**{label}**")
+                temporal_table(data)
+        else:
+            st.dataframe(display_comparison(comparison_rows(data, frames, order), frames),
+                         hide_index=True, width="stretch")
+            st.markdown("**Paroles non anglaises**")
+            st.caption("22 titres sur tout le fichier, et la langue n’est pas précisée : effectif trop "
+                       "faible pour en conclure quoi que ce soit.")
+            kpi_cards([share_card(frames, "Présence de paroles non anglaises",
+                                  lambda d: d.foreign_language.eq(1), lambda d: d.foreign_language.notna())], frames)
+
 elif route == "map":
     data = country_frame(frames, all_data)
     comparisons = data.rename(columns={"pays": "catégorie"})
-    country = st.session_state.get("map_country", "Tous")
+    # Sélecteur en tête : choisir un pays remplace le classement par deux cartes chiffrées.
+    country = st.selectbox("Retrouver un pays ou territoire", ["Tous"] + sorted(data.pays.unique()), key="map_country")
     order = [country] if country != "Tous" else ranked_categories(comparisons, limit=10, missing=None)
-    st.write(category_message(comparisons, frames, order))
-    view = st.radio("Lecture des pays", ["Comparaison des périodes", "Carte"], horizontal=True, key="country_view")
-    if view == "Carte":
-        period = st.radio("Période affichée", list(frames), format_func=labels.get, horizontal=True, key="map_period")
-        render(world_map(data, period, None if country == "Tous" else country, label=labels[period]), route)
-        st.markdown("**Comment lire la carte** · plus un pays est foncé, plus il est associé à de titres n°1. "
-                    "Violet très clair : 0 %. Gris : pays jamais documenté dans le fichier. "
-                    "L’échelle est commune aux deux périodes, donc les cartes sont comparables entre elles.")
-    elif country != "Tous":
+    # Carte choroplèthe écartée : les États-Unis saturaient l'échelle. world_map() reste
+    # dans charts.py comme trace de l'arbitrage.
+    if country != "Tous":
         # Une seule catégorie ne fait pas un graphique : deux chiffres suffisent.
         rows = data[data.pays.eq(country)].set_index("période").reindex(list(frames))
         kpi_cards([(f"{country} · part des titres n°1",
@@ -556,19 +559,17 @@ elif route == "map":
         shares_summary(comparisons, frames, [country])
     else:
         render(bars(comparisons, frames, order), route)
-        st.markdown("**Comment lire les barres** · les dix pays les plus représentés, classés sur la moyenne "
-                    "des deux périodes à poids égaux. Un titre peut être associé à plusieurs pays : "
-                    "le total dépasse donc 100 %.")
-    st.selectbox("Retrouver un pays ou territoire", ["Tous"] + sorted(data.pays.unique()), key="map_country")
+        st.markdown("**Comment lire les barres** · les dix pays les plus représentés, classés sur la "
+                    "moyenne des deux périodes à poids égaux. Un titre peut être associé à plusieurs "
+                    "pays : le total dépasse donc 100 %.")
     with detail_block(notes=[ORIGIN_NOTE,
-                        "Un titre peut être associé à plusieurs pays : le total dépasse 100 %. Un pays documenté mais absent de la sélection vaut zéro ; le gris signale un pays non documenté.",
+                        "Un titre peut être associé à plusieurs pays : le total dépasse 100 %. Un pays documenté mais absent de la sélection vaut zéro.",
                         "« Unites States » est normalisé en United States. « Columbia » est normalisé en Colombia sur le titre We Don't Talk About Bruno : correction étayée par les biographies Disney du casting, sans vérification exhaustive de chaque origine du casting."],
                     essentials=True):
         coverage_note(frames, list_column="origins", label="Origines exploitables")
         st.dataframe(display_comparison(comparison_rows(comparisons, frames, sorted(data.pays.unique())), frames),
                     hide_index=True, width="stretch")
 
-        
 elif route in ("data_a", "data_b"):
     period = "Période A" if route == "data_a" else "Référence B"
     data = frames[period].sort_values(["date", "song", "artist"], kind="stable")

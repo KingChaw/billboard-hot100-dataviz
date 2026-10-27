@@ -15,8 +15,8 @@ from periods import period_labels
 
 PERIODS = list(COLORS)
 CATEGORY_COLORS = {
-    "Uniquement États-Unis": "#5C1F3E", "Mixte": "#A85C85",
-    "Uniquement hors États-Unis": "#E0BACE", "Non classable": "#B9BEC8",
+    "Uniquement États-Unis": "#4A1430", "Mixte": "#A3517C",
+    "Uniquement hors États-Unis": "#EBD3DE", "Non classable": "#B9BEC8",
     "Groupe": "#4266A8", "Duo": "#92609D", "Solo": "#287C6C", "Non renseigné": "#626D7D",
     "Duo ou groupe constitué": "#4266A8", "Featuring": "#92609D", "Co-signature": "#B8642E",
 }
