@@ -1,5 +1,6 @@
 """Contrôles ciblés des corrections de l’itération de septembre 2026."""
 import io
+import json
 import math
 import unittest
 from unittest.mock import patch
@@ -13,7 +14,7 @@ from collaboration_rules import qualify_credits
 from dashboard_data import CREDITS, REUSE, comparison_rows, decades, overlap_message, ranked_categories
 from charts import binary_frame, share_frame, stacked, trend, distribution
 from ui import metric_message, selection_table
-from test_regression import go_to, ROOT, ROUTES, title_rows, TableParser
+from test_regression import go_to, ROOT, ROUTES, ROUTE_CASES, title_rows, TableParser
 
 
 class Corrections(unittest.TestCase):
@@ -143,6 +144,9 @@ class Corrections(unittest.TestCase):
 
     def test_origins_and_representative_titles(self):
         self.assertEqual(origin_group(['United States','Puerto Rico']),'États-Unis uniquement (dont Porto Rico)')
+        self.assertEqual(origin_group(['Puerto Rico']),'États-Unis uniquement (dont Porto Rico)')
+        self.assertEqual(origin_group(['Puerto Rico','France']),'Mixte États-Unis / autres')
+        self.assertEqual(origin_group([]),'Non classable')
         self.assertEqual(origin_group(['France','Germany']),'Hors États-Unis uniquement')
         self.assertEqual(origin_group(['Colombia','United States']),'Mixte États-Unis / autres')
         bruno=self.df[self.df.song.str.strip().eq("We Don't Talk About Bruno")].iloc[0]
@@ -169,20 +173,41 @@ class NewJourneys(unittest.TestCase):
 
     def test_country_comparisons_small_territory_and_empty_b(self):
         self.go('map')
-        self.app.radio(key='country_view').set_value('Comparaison des périodes').run()
+        self.assertEqual(len(self.app.get('plotly_chart')), 1)
+        spec = json.loads(self.app.get('plotly_chart')[0].proto.spec)
+        self.assertEqual(len(spec['data']), 2)
+        self.assertTrue(all(trace['type'] == 'bar' and trace['orientation'] == 'h' for trace in spec['data']))
         self.app.selectbox(key='map_country').set_value('Porto Rico').run()
         self.assertFalse(self.app.exception)
-        self.assertIn('Porto Rico',' '.join(c.value for c in self.app.caption))
+        self.assertFalse(self.app.get('plotly_chart'))  # Deux cartes chiffrées remplacent le classement.
+        self.assertIn('Porto Rico',' '.join(c.value for c in self.app.markdown))
+        expected = {}
+        for label, years in [('A', (2000, 2009)), ('B', (2020, 2024))]:
+            frame = select(prepare(), years)
+            count = frame.origins.map(lambda origins: 'Puerto Rico' in origins).sum()
+            expected[label] = (count, len(frame), 100 * count / len(frame))
+        table = self.app.dataframe[0].value.set_index('Indicateur')
+        for period, (count, total, part) in zip(['2000 – 2009', '2020 – 2024'], expected.values()):
+            self.assertEqual(table.loc['Porto Rico', period + ' · titres concernés'], count)
+            self.assertEqual(table.loc['Porto Rico', period + ' · total'], total)
+            self.assertAlmostEqual(table.loc['Porto Rico', period + ' (%)'], part)
         self.go('intro'); self.go('map')
-        self.assertEqual(self.app.radio(key='country_view').value,'Comparaison des périodes')
         self.assertEqual(self.app.selectbox(key='map_country').value,'Porto Rico')
+        self.assertFalse(self.app.get('plotly_chart'))
         self.app.radio(key='mode').set_value('Intervalles d’années').run()
         self.app.slider(key='years_b').set_value((1958,1959)).run()
         self.app.selectbox(key='genre').set_value('Non renseigné').run()
         self.assertFalse(self.app.exception, [e.message for e in self.app.exception])
         self.app.slider(key='years_a').set_value((2020,2024)).run()
-        for route in ROUTES:
-            self.go(route)
+        table = self.app.dataframe[0].value.set_index('Indicateur')
+        self.assertEqual(table.loc['Porto Rico', '1958 – 1959 · total'], 0)
+        self.assertTrue(pd.isna(table.loc['Porto Rico', '1958 – 1959 (%)']))
+        self.assertIn('Non disponible', ' '.join(c.value for c in self.app.markdown))
+        self.app.selectbox(key='map_country').set_value('Tous').run()
+        self.assertEqual(len(self.app.get('plotly_chart')), 1)
+        for route, view in ROUTE_CASES:
+            go_to(self.app, route, origins_view=view)
+            self.assertFalse(self.app.exception, [e.message for e in self.app.exception])
 
     def test_added_modes_and_persistent_indicators(self):
         for route, key in [('teams','teams_view'),('ages','ages_view')]:
@@ -191,10 +216,16 @@ class NewJourneys(unittest.TestCase):
             self.assertFalse(self.app.exception)
             self.go('summary'); self.go(route)
             self.assertEqual(self.app.radio(key=key).value,'Évolution par décennie')
-        for route in ['origins']:
-            self.go(route)
-            self.app.radio(key='composition_'+route).set_value('Comparaison des périodes').run()
+        for view in ['Composition', 'Évolution']:
+            self.go('origins')
+            self.app.radio(key='origins_view').set_value(view).run()
             self.assertFalse(self.app.exception)
+            self.go('summary'); self.go('origins')
+            self.assertEqual(self.app.radio(key='origins_view').value, view)
+            spec = json.loads(self.app.get('plotly_chart')[0].proto.spec)
+            self.assertEqual(len(spec['data']), 3)
+            self.assertTrue(all(t['type'] == ('bar' if view == 'Composition' else 'scatter')
+                                for t in spec['data']))
 
     def test_ar_scenario_context_csv_and_overlap_warning(self):
         self.app.selectbox(key='decade_a').set_value(2010).run()

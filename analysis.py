@@ -58,12 +58,21 @@ def origin_group(origins):
     return "Hors États-Unis uniquement"
 
 
+def introduction_ratios(df):
+    """Part de l’introduction par titre ; zéro connu conservé, durée nulle exclue."""
+    length = pd.to_numeric(df["length_sec"], errors="coerce")
+    intro = pd.to_numeric(df["intro_length_sec"], errors="coerce")
+    valid = length.notna() & intro.notna() & length.gt(0)
+    return (100 * intro / length.where(valid)).where(valid)
+
+
 def prepare(path=DATA):
     df = pd.read_csv(path)
     df["date"] = pd.to_datetime(df["date"], errors="coerce", utc=True)
     df["year"] = df["date"].dt.year
     for col in NUMERIC:
         df[col] = pd.to_numeric(df[col], errors="coerce")
+    df["intro_ratio"] = introduction_ratios(df)
     df["genres"] = df["discogs_genre"].apply(lambda x: categories(x, GENRE_LABELS) or ["Non renseigné"])
     df["origins"] = df["artist_place_of_origin"].apply(lambda x: categories(x, ORIGIN_LABELS))
     df["origin_group"] = df["origins"].apply(origin_group)

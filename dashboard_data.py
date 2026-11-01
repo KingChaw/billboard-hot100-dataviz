@@ -23,6 +23,15 @@ METRICS = {
     "acousticness": ("Caractère acoustique", "score / 100"),
     "loudness_d_b": ("Niveau sonore", "dB"),
 }
+# Mesure dérivée réservée à Format & son ; les autres sélecteurs restent inchangés.
+FORMAT_METRICS = {**METRICS, "intro_ratio": ("Part de l’introduction", "%")}
+SOUND_HELP = {
+    "bpm": "Le tempo indique la vitesse de la pulsation, en battements par minute. Un tempo élevé ne signifie pas nécessairement une énergie élevée.",
+    "energy": "Score de 0 à 100 décrivant l’intensité et l’activité perçues. Il résume une estimation acoustique, pas la qualité du morceau.",
+    "danceability": "Score de 0 à 100 estimant l’aptitude à danser, à partir notamment de la pulsation et de la régularité rythmique. Il ne mesure pas le succès en club.",
+    "acousticness": "Score de 0 à 100 estimant le caractère acoustique de l’enregistrement. Il ne compte pas les instruments acoustiques.",
+    "loudness_d_b": "Niveau sonore moyen de l’enregistrement, en décibels (dB). Une valeur moins négative correspond à un niveau plus élevé ; ce n’est pas le volume choisi par l’auditeur.",
+}
 CREDITS = {"writers_original": "Auteurs (sans les crédits de samples)", "writers_all": "Auteurs (crédits de samples inclus)", "producer_count": "Producteurs"}
 REUSE = {"sample": "Sample", "interpolation": "Interpolation", "cover": "Reprise"}
 AXES = {"length_sec": "Durée (secondes)", "intro_length_sec": "Introduction (secondes)",
@@ -49,7 +58,7 @@ COUNTRIES = {
 }
 
 
-def decades(df, column=None, origin=None, coverage=None, binary=None):
+def decades(df, column=None, origin=None, coverage=None, binary=None, genre=None):
     """Une médiane et Q1–Q3, ou une part / tous les titres ; pas de zéro inventé."""
     first, last = coverage or ((int(df.year.min()), int(df.year.max())) if len(df) else (1958, 2025))
     rows = []
@@ -61,7 +70,12 @@ def decades(df, column=None, origin=None, coverage=None, binary=None):
             label = f"{start}–janv. 2025" if start != end else "janv. 2025"
         row = dict(decade=decade, start=start, end=end, label=label, position=(start + end) / 2,
                    total=len(d), partial=decade < first or decade + 9 > last)
-        if origin is not None:
+        if genre is not None:
+            valid = len(d) if genre == "Non renseigné" else int(d.genres.map(lambda g: g != ["Non renseigné"]).sum())
+            count = int(d.genres.map(lambda g: genre in g).sum())
+            row.update(value=100 * count / len(d) if len(d) and valid else float("nan"),
+                       valid=valid, count=count, q1=float("nan"), q3=float("nan"))
+        elif origin is not None:
             valid = int(d.origins.map(bool).sum())
             count = int(d.origin_group.eq(origin).sum())
             row.update(value=100 * count / len(d) if len(d) and valid else float("nan"),
@@ -116,6 +130,22 @@ def comparison_rows(data, frames, order):
         row["B − A (points)"] = values[1] - values[0]
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+def quartile_examples(data, column):
+    """Jusqu’à trois titres distincts, proches de Q1, médiane et Q3 du filtre actif."""
+    available = data.dropna(subset=[column]).sort_values(["date", "song", "artist"], kind="stable")
+    rows = []
+    for label, quantile in [("Q1", .25), ("Médiane", .5), ("Q3", .75)]:
+        remaining = available.drop(index=[row["index"] for row in rows])
+        if remaining.empty:
+            break
+        target = available[column].quantile(quantile)
+        index = (remaining[column] - target).abs().idxmin()
+        row = remaining.loc[index]
+        rows.append({"index": index, "repère": label, "cible": target,
+                     "song": row.song, "artist": row.artist, "value": row[column]})
+    return rows
 
 
 def overlap_message(a, b):

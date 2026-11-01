@@ -27,14 +27,21 @@ Aucune dépendance applicative supplémentaire.
   décennies conservent leurs réglages indépendants.
 - Les dates sélectionnées apparaissent dans les widgets, cartes, légendes,
   infobulles, tableaux et noms des CSV. Deux sélections identiques restent distinctes.
-- Courbes, boîtes à moustaches séparées pour durée/intro, sélecteurs sonores,
-  barres d’instruments et genres ; couverture Discogs visible.
+- **Format & son** : cinq sous-pages, dans l’ordre **Vue d’ensemble**, **Durée &
+  introduction**, **Signature sonore**, **Instrumentation**, **Genres musicaux**.
+  La synthèse générale reste indépendante de cette vue d’ensemble.
+  Quatre repères de comparaison, distributions séparées, historiques avec médiane
+  et Q1–Q3 ; un sélecteur conserve l’unité de chaque mesure.
+  Les instruments centraux et les sections présentes restent deux analyses distinctes.
+  Les genres proposent une comparaison simultanée et une évolution historique ;
+  « Non renseigné » est affiché à part, sans genre de remplacement.
 - Pays : **Carte / Comparaison des périodes**, avec échelle commune et accès aux îles.
   Compositions exclusives : **100 % / Comparaison des périodes**.
 - Q3 organisée en profils, équipes de création, réutilisation. Les équipes et
   pratiques ont une comparaison des périodes et une évolution par décennie.
-- **Titres associés · tableau et CSV** dans chaque analyse : recherche et
-  exemples proches des quartiles. Tableau/export identiques, précision conservée.
+- Dans **Format & son → Détails**, jusqu’à trois exemples issus des titres filtrés,
+  proches de Q1, de la médiane et de Q3 pour la mesure sélectionnée. Les raccourcis
+  vers **Données** conservent le genre et les périodes ; recherche et CSV y restent disponibles.
 - **Détails** pour méthode et approfondissements ; retour en haut disponible.
   Sur mobile, défilement vertical privilégié pour garder les textes lisibles.
 
@@ -42,6 +49,14 @@ Les sources commencent le 4 août 1958 et s’arrêtent le 11 janvier 2025. Un t
 compte une fois selon sa première semaine au n°1. Aucune prédiction de succès
 ou recommandation de recrutement. Les crédits composés non résolus restent
 indéterminés ; consulter l’audit avant d’interpréter les taux de collaboration.
+
+Dans Format & son, les cartes et distributions portent sur les deux périodes
+sélectionnées. Les historiques utilisent **toutes les décennies du corpus avec
+le filtre de genre actif**, indépendamment des périodes de comparaison.
+La part d’introduction est la médiane de `100 * intro_length_sec / length_sec`
+calculé titre par titre, avec deux valeurs renseignées et une durée positive.
+Les anciennes routes `intro`, `central` et `presence` sont redirigées vers les
+pages fusionnées, y compris dans la mémoire de navigation d’une session ouverte.
 
 ## Vérifier
 
@@ -62,6 +77,11 @@ lancé avec un profil temporaire distinct et `--remote-debugging-port=9226`.
 Ce script de développement ne fait pas partie des dépendances de l’application.
 Voir [VALIDATION.md](VALIDATION.md) pour les vérifications réellement exécutées.
 
+Les contrôles spécifiques de la refonte sont dans `tests/test_format_sound.py`.
+Le script `tests/format_browser_qa.mjs` utilise un Chrome de test isolé sur le port
+9227 et ce clone servi sur 8504 ; il contrôle **320, 390 et 1440 px**. Résultats et
+captures : `livrables/format-son/`.
+
 ## Fichiers
 
 - `analysis.py`, `collaboration_rules.py` : préparation et qualification des crédits.
@@ -70,6 +90,8 @@ Voir [VALIDATION.md](VALIDATION.md) pour les vérifications réellement exécut�
 - `components/` : dimensions des figures et position de lecture ; aucun service externe.
 - `static/` : fond de carte local ; `data/` : sources brutes inchangées.
 - [METHODES.md](METHODES.md) : définitions et limites.
+- [Bilan Format & son](livrables/format-son/BILAN.md) : changements, fichiers,
+  résultats actuels et limites de la refonte du 1er novembre 2026.
 - [BILAN.md](livrables/BILAN.md) : suivi de toutes les recommandations.
 - [JOURNAL_COMPLEMENT.md](livrables/JOURNAL_COMPLEMENT.md) : rédaction à intégrer au
   journal du groupe et trame de soutenance ; sources et captures associées.
@@ -77,6 +99,6 @@ Voir [VALIDATION.md](VALIDATION.md) pour les vérifications réellement exécut�
   `PROPOSITION.md` et les références statistiques historiques sont conservées.
 
 La refonte du dashboard reprend une navigation à deux niveaux et une colonne
-réservée aux filtres. Les calculs et données sont conservés. Les 33 tests et
-les vérifications sur ordinateur et mobile sont détaillés dans [VALIDATION.md](VALIDATION.md).
+réservée aux filtres. Les calculs et données sont conservés. Les résultats actuels,
+y compris les échecs préexistants hors Format & son, sont détaillés dans [VALIDATION.md](VALIDATION.md).
 L’accès de l’enseignant au dépôt privé reste à vérifier par le groupe.

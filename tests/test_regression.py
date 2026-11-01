@@ -86,21 +86,28 @@ class AnalyticalRegression(unittest.TestCase):
         self.assertEqual(duration(float('nan')), 'Non disponible')
 
 
-def go_to(app, route):
+def go_to(app, route, *, origins_view=None):
+    route = {'intro': 'duration', 'central': 'instrumentation', 'presence': 'instrumentation'}.get(route, route)
     groups = [
         ['summary'],
-        ['format_trend', 'duration', 'intro', 'sound', 'central', 'presence', 'genres'],
-        ['origin_trend', 'origins', 'map'],
+        FORMAT_ROUTES,
+        ['origins', 'map'],
         ['ages', 'formats', 'teams', 'reuse'],
         ['data_a', 'data_b'],
     ]
     group = next(i for i, routes in enumerate(groups) if route in routes)
     app.button(key=f'group_{group}').click().run()
     app.button(key='nav_' + route).click().run()
+    if route == 'origins' and origins_view is not None:
+        app.radio(key='origins_view').set_value(origins_view).run()
 
 
-ROUTES = ['format_trend', 'duration', 'intro', 'sound', 'central', 'presence', 'genres',
-          'origin_trend', 'origins', 'map', 'ages', 'formats', 'teams', 'reuse']
+FORMAT_ROUTES = ['format_trend', 'duration', 'sound', 'instrumentation', 'genres']
+ROUTES = [*FORMAT_ROUTES,
+          'origins', 'map', 'ages', 'formats', 'teams', 'reuse']
+# L’ancienne page d’évolution est désormais un mode : conserver les deux parcours.
+ROUTE_CASES = [(route, view) for route in ROUTES
+               for view in (['Évolution', 'Composition'] if route == 'origins' else [None])]
 
 
 class DashboardJourneys(unittest.TestCase):
@@ -111,8 +118,8 @@ class DashboardJourneys(unittest.TestCase):
     def clean(self):
         self.assertFalse(self.app.exception, [x.message for x in self.app.exception])
 
-    def go(self, route):
-        go_to(self.app, route)
+    def go(self, route, *, origins_view=None):
+        go_to(self.app, route, origins_view=origins_view)
         self.clean()
 
     def chart(self):
@@ -124,10 +131,11 @@ class DashboardJourneys(unittest.TestCase):
         self.assertEqual(self.app.selectbox(key='decade_b').value, 'recent')
         self.assertIn('129 titres', ' '.join(m.value for m in self.app.markdown))
         self.assertIn('81 titres', ' '.join(m.value for m in self.app.markdown))
-        for route in ROUTES:
-            with self.subTest(route=route):
-                self.go(route)
-                self.assertEqual(len(self.app.get('plotly_chart')), 1)
+        for route, view in ROUTE_CASES:
+            with self.subTest(route=route, view=view):
+                self.go(route, origins_view=view)
+                expected_charts = {'duration': 3, 'sound': 2, 'instrumentation': 2}.get(route, 1)
+                self.assertEqual(len(self.app.get('plotly_chart')), expected_charts)
                 self.assertFalse(self.app.get('download_button'))  # Export regroupé dans Données.
                 detail = [e for e in self.app.expander if e.label == 'Détails']
                 self.assertEqual(len(detail), 1)
@@ -140,7 +148,7 @@ class DashboardJourneys(unittest.TestCase):
     def test_all_shortcuts_preserve_filters(self):
         self.app.selectbox(key='genre').set_value('Pop').run()
         self.app.selectbox(key='decade_a').set_value(1980).run()
-        for route in ['duration', 'intro', 'origins', 'map', 'ages', 'teams']:
+        for route in ['duration', 'format_trend', 'origins', 'map', 'ages', 'teams']:
             self.go('summary')
             self.app.button(key='shortcut_' + route).click().run()
             self.clean()
@@ -166,8 +174,7 @@ class DashboardJourneys(unittest.TestCase):
     def test_selectors_persist_across_pages(self):
         for route, key, values in [
             ('sound', 'sonic', ['energy', 'danceability', 'acousticness', 'loudness_d_b', 'bpm']),
-            ('format_trend', 'evolution_metric', ['length_sec', 'intro_length_sec', 'bpm', 'energy', 'danceability', 'acousticness', 'loudness_d_b']),
-            ('origin_trend', 'origin_metric', ['États-Unis uniquement (dont Porto Rico)', 'Mixte États-Unis / autres', 'Hors États-Unis uniquement'])]:
+            ('format_trend', 'evolution_metric', ['length_sec', 'intro_length_sec', 'bpm', 'energy', 'danceability', 'acousticness', 'loudness_d_b'])]:
             self.go(route)
             for value in values:
                 self.app.selectbox(key=key).set_value(value).run()
@@ -175,18 +182,41 @@ class DashboardJourneys(unittest.TestCase):
             self.go('summary')
             self.go(route)
             self.assertEqual(self.app.selectbox(key=key).value, values[-1])
+        from dashboard_data import ORIGINS, decades
+        for view in ['Composition', 'Évolution']:
+            self.go('origins', origins_view=view)
+            self.assertEqual(self.app.radio(key='origins_view').options, ['Évolution', 'Composition'])
+            spec = self.chart()
+            self.assertEqual([t['name'] for t in spec['data']], list(ORIGINS.values())[:3])
+            self.assertTrue(all(t['type'] == ('scatter' if view == 'Évolution' else 'bar')
+                                for t in spec['data']))
+            self.go('summary')
+            self.go('origins')
+            self.assertEqual(self.app.radio(key='origins_view').value, view)
+        self.app.selectbox(key='genre').set_value('Pop').run()
+        tables = [t.value for t in self.app.dataframe if 'Période couverte' in t.value]
+        self.assertEqual(len(tables), 3)
+        filtered = select(prepare(), (1958, 2025), 'Pop')
+        for table, category in zip(tables, list(ORIGINS)[:3]):
+            expected = decades(filtered, origin=category, coverage=(1958, 2025))
+            self.assertEqual(table['Titres concernés'].tolist(), expected['count'].tolist())
+            pd.testing.assert_series_equal(table['Médiane / part (%)'], expected.value, check_names=False)
+        self.app.selectbox(key='decade_a').set_value(1980).run()
+        changed = [t.value for t in self.app.dataframe if 'Période couverte' in t.value]
+        for before, after in zip(tables, changed):
+            pd.testing.assert_frame_equal(before, after)  # L’historique ne suit pas les seules périodes comparées.
 
     def test_empty_one_or_both_periods_all_routes(self):
         self.app.radio(key='mode').set_value('Intervalles d’années').run()
         self.app.slider(key='years_a').set_value((1958, 1959)).run()
         self.app.selectbox(key='genre').set_value('Non renseigné').run()
-        for route in ROUTES + ['data_a', 'summary']:
-            self.go(route)
+        for route, view in ROUTE_CASES + [('data_a', None), ('summary', None)]:
+            self.go(route, origins_view=view)
         self.go('data_a')
         self.assertEqual(len(title_rows(self.app)) - 1, 0)
         self.app.slider(key='years_b').set_value((1958, 1959)).run()
-        for route in ROUTES + ['data_b', 'summary']:
-            self.go(route)
+        for route, view in ROUTE_CASES + [('data_b', None), ('summary', None)]:
+            self.go(route, origins_view=view)
 
     def test_missing_metric_is_not_zero(self):
         self.app.radio(key='mode').set_value('Intervalles d’années').run()
@@ -236,14 +266,28 @@ class NewAggregates(unittest.TestCase):
                 self.assertFalse(result.loc[2000, 'partial'])
             for origin in list(ORIGINS)[:3]:
                 result = decades(data, origin=origin, coverage=(1958, 2025)).set_index('decade')
-                d = select(data, (2000, 2009))
-                self.assertAlmostEqual(result.loc[2000, 'value'], 100 * d.origin_group.eq(origin).sum() / len(d))
+                for row in result.itertuples():
+                    d = select(data, (row.start, row.end))
+                    count = int(d.origin_group.eq(origin).sum())
+                    valid = int(d.origins.map(bool).sum())
+                    self.assertEqual(row.total, len(d))
+                    self.assertEqual(row.valid, valid)
+                    self.assertEqual(row.count, count)
+                    if valid:
+                        self.assertAlmostEqual(row.value, 100 * count / len(d))
+                    else:
+                        self.assertTrue(pd.isna(row.value))
+                self.assertTrue(result.loc[1950, 'partial'])
+                self.assertTrue(result.loc[2020, 'partial'])
 
     def test_stacked_totals_include_unknowns(self):
         from charts import stacked
+        from analysis import origin_group
         from dashboard_data import ORIGINS
         d = self.df.iloc[:4].copy()
-        d['origin_group'] = list(ORIGINS)
+        d['origins'] = [['United States'], ['Puerto Rico', 'France'], ['France'], []]
+        d['origin_group'] = d.origins.map(origin_group)
+        self.assertEqual(d.origin_group.tolist(), list(ORIGINS))
         d['artist_format'] = ['Groupe', 'Duo', 'Solo', 'Non renseigné']
         frames = {'Période A': d, 'Référence B': d.iloc[:2]}
         for col, order in [('origin_group', list(ORIGINS.values())), ('artist_format', d.artist_format.tolist())]:
@@ -252,6 +296,13 @@ class NewAggregates(unittest.TestCase):
                 self.assertAlmostEqual(sum(trace.x[i] for trace in fig.data), 100)
                 self.assertTrue(all(trace.y[i] == list(frames)[i] for trace in fig.data))
             self.assertEqual(fig.data[-1].x[0], 25)
+        from dashboard_data import decades
+        for category in list(ORIGINS)[:3]:
+            history = decades(d, origin=category, coverage=(1958, 2025)).iloc[0]
+            self.assertEqual((history.total, history.valid, history['count']), (4, 3, 1))
+            self.assertEqual(history.value, 25)  # Inconnu maintenu au dénominateur.
+            unavailable = decades(d.iloc[3:], origin=category, coverage=(1958, 2025)).iloc[0]
+            self.assertTrue(pd.isna(unavailable.value))
 
     def test_map_shared_scale_country_shares_and_unknowns(self):
         from dashboard_data import country_frame

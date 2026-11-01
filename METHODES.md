@@ -48,6 +48,9 @@ parts des périodes disponibles**, avec poids égaux. Catégorie absente d’une
 période non vide : zéro ; période vide : aucun poids. Égalité : ordre alphabétique.
 Une même liste et un même ordre servent aux deux périodes. « Non renseigné » est ajouté aux
 genres, hors du top 9 ; les autres catégories restent dans Détails et les filtres.
+Pour les genres musicaux, une période entièrement sans genre renseigné est
+indisponible et exclue du classement ; elle n’est pas assimilée à une absence
+connue de tous les genres. Sa part « Non renseigné » reste calculable.
 
 ## Courbes et distributions
 
@@ -71,6 +74,58 @@ valeur exploitable. Les équipes proposent trois indicateurs temporels
 (auteurs tous crédits, hors samples/interpolations, producteurs). Les pratiques
 proposent sample, interpolation ou reprise, sur tous les titres de la décennie.
 Les distributions des deux périodes restent accessibles dans la même section.
+
+## Format & son
+
+Les cinq vues séparent le panorama, la durée et l’introduction, la signature
+sonore, l’instrumentation et les genres. La synthèse générale du dashboard est
+conservée. Les anciens accès aux introductions et aux instruments redirigent
+vers leurs vues fusionnées, sans changer les filtres.
+
+La **part de l’introduction** est calculée pour chaque titre :
+`intro_ratio = 100 * intro_length_sec / length_sec`, uniquement lorsque les deux
+valeurs sont renseignées et `length_sec > 0`. La médiane et les quartiles sont
+calculés sur les ratios individuels ; **ce n’est pas le ratio des médianes**.
+Une introduction de zéro seconde contribue au calcul. Une durée totale nulle,
+négative ou manquante, ou une introduction manquante, donne un ratio manquant.
+Les effectifs exploitables peuvent donc différer selon les trois mesures.
+Les durées médianes totales sont affichées en minutes et secondes ; les
+distributions restent en secondes. Les introductions sont en secondes, les
+ratios en %, leurs écarts en points de pourcentage.
+
+Les cinq caractéristiques sonores gardent leurs échelles propres : tempo en
+BPM, énergie/dansabilité/caractère acoustique en scores sur 100, niveau sonore
+en dB. Les scores ont une échelle graphique de 0 à 100 ; les dB conservent
+leurs valeurs négatives, sans imposer une origine à zéro. Aucun radar ni
+agrégat ne mélange ces grandeurs. Un écart entre médianes décrit deux
+distributions ; il ne démontre pas une évolution identique pour chaque titre.
+
+L’**instrumentation** sépare le rôle central (voix, guitare, piano/claviers,
+basse) de la présence de cordes orchestrales ou cuivres/vents. Tous ces
+indicateurs peuvent se cumuler. Chaque barre utilise tous les titres filtrés
+de sa période au dénominateur, avec les effectifs renseignés dans le survol
+et Détails. Le fichier binaire distingue 0, 1 et valeur absente.
+
+L’historique des **genres Discogs** utilise, à chaque décennie, le nombre de
+titres associés au genre choisi divisé par tous les titres filtrés de cette
+décennie. Un titre multigenre contribue une fois à chaque genre associé.
+Une période de comparaison ou décennie vide ou sans aucun genre musical renseigné
+est indisponible pour un genre musical ; une absence connue d’un genre vaut zéro. « Non renseigné »
+peut être suivi séparément : ses occurrences et son dénominateur restent connus
+même si tous les genres manquent. Il n’y a aucun complément par `cdr_genre`.
+
+Le sélecteur historique de genre est distinct du filtre global : dans le
+sous-corpus Pop, suivre Rock mesure la présence conjointe de Pop et Rock ;
+suivre Pop donne 100 % pour toute décennie non vide. Les cartes A/B et les
+distributions utilisent seulement les deux périodes choisies, alors que tous
+les historiques couvrent 1958–janvier 2025, avec ce même filtre global.
+
+Les exemples de Format & son se trouvent dans Détails et utilisent la mesure
+historique sélectionnée ainsi que la période d’exemples choisie. Les cibles
+Q1/médiane/Q3 sont calculées sur tous les titres filtrés de cette période ;
+les titres sont pris dans cette même sélection, sans doublon, par distance
+absolue à la cible, puis date, titre et artiste en cas d’égalité. Les raccourcis
+vers Données préservent les filtres et le fonctionnement de la recherche/export.
 
 ## Artistes, collaborations, crédits
 

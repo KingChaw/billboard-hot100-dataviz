@@ -1,3 +1,215 @@
+# Correction des tests Origines — 1er novembre 2026
+
+**Suite complète : 47 tests sur 47 réussis**, dont les **15 tests Format & son**.
+Cette section décrit la dernière intervention ; les sections suivantes conservent
+les validations antérieures, y compris leurs échecs désormais corrigés.
+
+## Périmètre et état initial
+
+Le nouveau clone est resté sur `suite-refonte-profils-creation`, sans changement
+de branche, commit, push, merge, rebase ou reset. Les modifications locales
+présentes au début ont été préservées. Les empreintes de 107 fichiers ont été
+conservées avant toute correction pour contrôler le périmètre.
+
+Commande exécutée avant modification puis après correction :
+
+```bash
+PYTHONPYCACHEPREFIX=/private/tmp/billboard-pycache python3 -m unittest discover -s tests -v
+```
+
+- Avant : **47 tests, 39 réussis, 1 échec et 7 erreurs**.
+- Après : **47 tests, tous réussis, aucun échec, erreur ou test ignoré**.
+- Les 47 noms de tests sont identiques avant/après : aucun test supprimé,
+  désactivé ou renommé ; aucun mock ajouté pour cette correction.
+
+Journaux : [avant](livrables/origines-tests/tests-avant.log) et
+[après](livrables/origines-tests/tests-apres.log).
+
+## Les huit diagnostics initiaux et leurs corrections
+
+Les lignes ci-dessous sont celles de l’état initial, conservé dans le journal
+avant correction. Les huit diagnostics proviennent d’attentes obsolètes, sans
+bug fonctionnel correspondant dans la navigation ou les calculs de l’application.
+
+| Test | Fichier et ligne initiaux | Message | Attente du test | Interface réelle / cause | Correction et couverture conservée |
+|---|---|---|---|---|---|
+| `DashboardLayout.test_dates_on_all_pages_and_comparison_tables` | `tests/test_dashboard_layout.py:39` | `KeyError: nav_origin_trend` | Parcours d’une route d’évolution séparée. | **Test obsolète.** Évolution est le mode initial de origins ; il n’y a plus de nav_origin_trend. | ROUTE_CASES parcourt origins en Évolution et Composition ; les contrôles de dates/colonnes/infobulles sont conservés dans les deux modes. |
+| `DashboardLayout.test_identical_periods_keep_two_series_and_two_data_pages` | `tests/test_dashboard_layout.py:72` | `KeyError: ticktext` | Composition horizontale avec deux périodes sur Y. | **Test obsolète.** origins ouvre Évolution ; la composition actuelle est verticale, avec les périodes sur X. | Sélection explicite de Composition ; vérification des deux libellés X, des trois traces, des parts identiques, des totaux 81/81, du total de 100 % et des deux pages Données. |
+| `DashboardLayout.test_sidebar_filters_and_remembered_subpage` | `tests/test_dashboard_layout.py:27` | `AssertionError: origins != origin_trend` | Entrée de rubrique sur origin_trend. | **Test obsolète.** L’entrée actuelle est origins ; la rubrique mémorise aussi la dernière sous-page. | Attente origins ; aller-retour entre rubriques, mémoire de map, de Porto Rico, du mode Composition et du filtre Pop. |
+| `NewJourneys.test_added_modes_and_persistent_indicators` | `tests/test_improvements.py:196` | `KeyError: composition_origins` | Ancien sélecteur Comparaison des périodes. | **Test obsolète.** origins_view propose Évolution et Composition. | Les deux modes sont sélectionnés puis retrouvés après navigation ; contrôle des trois séries et de leur type bar/scatter. Les tests Équipes/Âge sont conservés. |
+| `NewJourneys.test_country_comparisons_small_territory_and_empty_b` | `tests/test_improvements.py:172` | `KeyError: country_view` | Ancien choix carte/comparaison et nom du pays dans une légende. | **Test obsolète.** Le classement utilise directement deux séries de barres ; choisir un pays affiche deux cartes chiffrées. | Vérification des barres, du remplacement par les cartes Porto Rico, des parts/comptes/totaux calculés sur les lignes réelles, de la persistance et de B vide, puis retour au classement. |
+| `DashboardJourneys.test_default_and_every_route` | `tests/test_regression.py:131 ; go_to():100` | `KeyError: nav_origin_trend` | Route supprimée dans la liste des pages. | **Test obsolète.** Deux sous-pages : origins et map ; Évolution/Composition sont deux modes de origins. | go_to accepte origins_view ; ROUTES utilise les routes actuelles et ROUTE_CASES conserve les deux analyses. Les contrôles de figures, Détails et exports restent actifs. |
+| `DashboardJourneys.test_empty_one_or_both_periods_all_routes` | `tests/test_regression.py:187 ; go_to():100` | `KeyError: nav_origin_trend` | Parcours de l’ancienne route avec une ou deux périodes vides. | **Test obsolète.** Les deux analyses vivent dans origins. | Les deux modes sont parcourus avec A vide puis A/B vides ; les contrôles des autres rubriques et des tables Données sont conservés. |
+| `DashboardJourneys.test_selectors_persist_across_pages` | `tests/test_regression.py:174 ; go_to():100` | `KeyError: nav_origin_trend` | Un sélecteur origin_metric choisissait une des trois catégories. | **Test obsolète.** Les trois catégories sont maintenant tracées simultanément ; le choix persistant est origins_view. | Vérification des trois noms et types de traces dans les deux modes, de leur persistance, des comptes/parts historiques après filtre Pop et de l’indépendance vis-à-vis des périodes de comparaison. Les sélecteurs Format & son restent testés. |
+
+## Vérifications statistiques conservées et renforcées
+
+Les références numériques existantes et les CSV n’ont pas été modifiés.
+Les tests vérifient notamment :
+
+- Les trois catégories géographiques exclusives et les origines inconnues ;
+  un fixture explicite associe un titre à chacune des quatre catégories.
+- Porto Rico seul classé avec les États-Unis, Porto Rico + France classé Mixte,
+  et Porto Rico conservé séparément dans la comparaison des territoires.
+- Les titres inconnus maintenus au dénominateur : trois catégories connues
+  de 1 titre sur 4 donnent chacune 25 %, avec 3 origines exploitables sur 4.
+  Une période entièrement inconnue reste indisponible, pas nulle.
+- Les comptes, dénominateurs, parts et couvertures de **chaque décennie**,
+  sans filtre puis avec Pop ; première et dernière décennies partielles.
+- Les trois courbes simultanées, les périodes A/B identiques, chevauchantes
+  ou vides, la persistance des filtres, modes et pays, et les parts par pays.
+- L’historique sur tout le corpus filtré par genre, indépendant des deux
+  périodes de comparaison ; la composition sur les périodes sélectionnées.
+- La non-régression de Format & son, de Profils et création et des tableaux/CSV
+  de Données, dans la suite complète.
+
+## Problème fonctionnel supplémentaire trouvé dans le navigateur
+
+Le contrôle réel a trouvé un débordement de **16 px** sur Pays et territoires
+à 390 px : la sonde invisible `.st-key-chart_viewport`, placée à x = 16 avec
+une largeur de 390, poussait le contenu jusqu’à x = 406. Ce problème est distinct
+des huit tests obsolètes. Capture conservée :
+[pays-mobile-debordement-avant.png](livrables/origines-tests/pays-mobile-debordement-avant.png).
+
+Correction : deux lignes CSS ajoutées dans `theme.py`, actives uniquement quand
+le bouton `nav_map` est sélectionné, qui donnent une largeur nulle à la sonde
+et masquent son débordement. Aucun changement de calcul, de données, de route,
+de widget ou de graphique. Le retrait de ces deux lignes restitue exactement
+l’empreinte initiale de `theme.py` : les styles préexistants sont préservés.
+
+## Contrôles navigateur exécutés
+
+```bash
+BILLBOARD_CDP_PORT=9228 BILLBOARD_URL=http://127.0.0.1:8504 node tests/browser_qa.mjs origins
+```
+
+**14 observations réussies dans Chrome isolé** : Évolution, Composition,
+comparaison des pays et Porto Rico à **1440 × 900, 390 × 844 et 320 × 844**
+(12 observations), puis une période étudiée vide et deux périodes vides.
+Contrôles des types et noms de séries, des axes, de la persistance du mode et du
+pays, des exceptions et du débordement horizontal. Les captures des graphiques
+mobile ont été inspectées. Aucun débordement ne subsiste dans ces observations.
+
+Rapport : [verification-navigateur.json](livrables/origines-tests/verification-navigateur.json).
+Journal : [navigateur.log](livrables/origines-tests/navigateur.log).
+Les paramètres d’URL et de port permettent de réutiliser le serveur local avec
+un profil Chrome de test. Les anciens sélecteurs Origines ont aussi été retirés
+des parcours du script ; le contrôle courant est disponible par le mode `origins`.
+
+Les modes historiques `scenario` et `suite` du script navigateur n’ont pas été
+exécutés pendant cette intervention. Le mode historique `scenario` conserve
+encore d’anciens contrôles d’exemples de Format & son ; ses contrôles actuels
+restent ceux de `test_format_sound.py` et `format_browser_qa.mjs`, inchangés.
+Les contrôles mobiles utilisent l’émulation Chrome, sans téléphone physique.
+
+## Fichiers modifiés pendant cette intervention
+
+- `tests/test_regression.py` : navigation, scénarios, persistance et contrôles statistiques.
+- `tests/test_dashboard_layout.py` : modes, mémoire de navigation, axes et périodes identiques.
+- `tests/test_improvements.py` : comparaison des pays, Porto Rico, inconnus et persistance.
+- `tests/browser_qa.mjs` : routes Origines actuelles, paramètres locaux et mode de contrôle ciblé.
+- `theme.py` : règle CSS limitée à Pays et territoires pour le débordement mobile observé.
+- `VALIDATION.md` : ce diagnostic et les résultats effectivement obtenus.
+- `livrables/origines-tests/` : journaux, captures, rapport navigateur et contrôle d’intégrité.
+
+`app.py`, `analysis.py`, `dashboard_data.py`, `charts.py`, `ui.py`, `periods.py`,
+les tests et le script dédiés à Format & son, les CSV et tous les livrables de
+la refonte précédente restent identiques à leurs empreintes initiales.
+La règle CSS ajoutée dépend exclusivement de la sélection de Pays et territoires.
+Voir [integrite.json](livrables/origines-tests/integrite.json).
+
+Aucun problème fonctionnel restant observé dans le périmètre vérifié.
+Les avertissements de contexte Streamlit et de dépréciation pandas préexistants
+restent visibles dans les journaux ; ils n’ont pas été masqués. `git diff --check`
+ne signale pas d’erreur. Aucun commit ni push effectué.
+
+---
+
+# Format & son — 1er novembre 2026
+
+Refonte limitée à **Format & son et sa navigation**, dans le nouveau clone,
+sur `suite-refonte-profils-creation`, basée sur `refonte-profils-creation`.
+Aucun commit, push, merge ou changement de branche. La correction déjà présente
+dans `ui.py` a été conservée.
+
+## Tests exécutés sur cette version
+
+Commande équivalente à celle demandée (`python` est absent de ce Mac) :
+
+```bash
+PYTHONPYCACHEPREFIX=/private/tmp/billboard-pycache python3 -m unittest discover -s tests -v
+```
+
+- Avant modification : **32 tests ; 1 échec et 7 erreurs**, soit 24 réussis.
+- Après refonte : **47 tests ; les mêmes 1 échec et 7 erreurs**, soit **39 réussis**.
+- **15 nouveaux tests Format & son réussis**, dont un avec toutes les mesures
+  manquantes. Aucun test supprimé ou ignoré ; attentes de navigation et de
+  nombre de figures adaptées seulement pour Format & son.
+- La suite complète **ne passe donc pas intégralement**. Les huit diagnostics
+  préexistants ont été comparés par nom : ils sont identiques avant/après.
+
+Journaux conservés : [avant](livrables/format-son/tests-avant.log),
+[après](livrables/format-son/tests-apres.log),
+[tests ciblés](livrables/format-son/tests-cibles.log).
+
+Les échecs concernent les attentes anciennes des tests d’Origines :
+`nav_origin_trend`, `composition_origins`, `country_view`, les axes de composition
+et la page mémorisée `origin_trend`. Ces rubriques et leurs contrôles n’ont pas
+été modifiés pour faire passer les tests. Les cas concernés restent dans la suite :
+
+- `DashboardLayout.test_dates_on_all_pages_and_comparison_tables` (sous-cas `origin_trend`).
+- `DashboardLayout.test_identical_periods_keep_two_series_and_two_data_pages`.
+- `DashboardLayout.test_sidebar_filters_and_remembered_subpage`.
+- `NewJourneys.test_added_modes_and_persistent_indicators`.
+- `NewJourneys.test_country_comparisons_small_territory_and_empty_b`.
+- `DashboardJourneys.test_default_and_every_route` (sous-cas `origin_trend`).
+- `DashboardJourneys.test_empty_one_or_both_periods_all_routes`.
+- `DashboardJourneys.test_selectors_persist_across_pages`.
+
+## Contrôles statistiques et de périmètre
+
+Les tests couvrent les cinq pages, les sélecteurs, les raccourcis depuis la
+synthèse, les routes fusionnées et leur mémoire, les filtres, les périodes
+vides/identiques/partielles et la persistance des sélections. Ils vérifient :
+
+- **1 177 titres**, une observation par titre ; empreintes des données brutes
+  identiques aux références du dépôt.
+- Ratio individuel d’introduction avant médiane ; zéro connu, absence, durée
+  nulle ou négative ; médianes et quartiles après filtre.
+- Historiques indépendants des deux intervalles de comparaison, mais dépendants
+  du genre global ; Q1–Q3 et effectifs recalculés.
+- Genres : comptes réels, dénominateurs, co-genres, zéro connu versus période
+  entièrement inconnue, catégorie manquante séparée et périodes partielles.
+- Instrumentation : parts cumulables, effectifs renseignés, écarts en points,
+  absence de delta si un côté manque.
+- Exemples issus des lignes filtrées, cibles de quartiles, ex æquo déterministes,
+  jusqu’à trois titres distincts ; accès à Données avec filtres conservés.
+
+Les blocs applicatifs d’Origines, de Profils et création et de Données sont
+identiques à `HEAD`. Le rapport [statistiques.json](livrables/format-son/statistiques.json)
+conserve ces contrôles, les empreintes et les statistiques de référence.
+`git diff --check` ne signale pas d’erreur.
+
+## Vérification visuelle
+
+**26 contrôles Chrome réussis** : 24 observations (huit scénarios aux trois
+largeurs), sans exception ni débordement horizontal, puis deux survols réels
+(médiane du tempo et barres d’instrumentation). Les accès à Données retrouvent
+les 81 titres de référence à chaque taille. Les axes, légendes, cartes et
+petites largeurs ont aussi été inspectés sur les captures.
+
+Rapport final de Chrome : voir `livrables/format-son/verification-navigateur.json`
+et les captures du même dossier. Le script reproductible est
+`tests/format_browser_qa.mjs`, avec Streamlit sur 8504 et un Chrome isolé sur
+9227. Les dimensions visées sont **1440 × 1000, 390 × 844 et 320 × 844**.
+Le bilan final des contrôles navigateur figure dans
+[le livrable de refonte](livrables/format-son/BILAN.md).
+
+Les rapports ci-dessous concernent les versions antérieures ; leurs nombres
+de tests et descriptions d’interface ne sont pas ceux de cette refonte.
+
+---
+
 # Refonte du dashboard — 25 octobre 2026
 
 **33 tests réussis**, journal : [tests-refonte-dashboard.log](livrables/tests-refonte-dashboard.log).

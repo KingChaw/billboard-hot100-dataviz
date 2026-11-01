@@ -27,6 +27,11 @@ CSS = """
 [data-testid="stMainBlockContainer"] > [data-testid="stVerticalBlock"] { gap: .65rem; }
 [data-testid="stMarkdownContainer"] { margin-bottom: 0; }
 .st-key-page_position, .st-key-chart_viewport { position: absolute; height: 0; min-height: 0; margin: 0; }
+/* Les sondes invisibles ne doivent pas élargir le viewport mobile. */
+.st-key-page_position { width: 0 !important; overflow: hidden; }
+[class*="st-key-chart_viewport_format_"] { position: absolute; width: 0 !important; height: 0; min-height: 0; margin: 0; overflow: hidden; }
+/* Pays et territoires : la sonde ne doit pas dépasser les marges sur mobile. */
+.stApp:has(.st-key-nav_map button[kind="primary"]) .st-key-chart_viewport { width: 0 !important; overflow: hidden; }
 [data-testid="stSidebarHeader"] { height: 0; min-height: 0; padding: 0; }
 [data-testid="stSidebarHeader"] button { position: absolute; right: 8px; top: 18px; z-index: 2; }
 [data-testid="stSidebar"] { top: var(--banner-height); height: calc(100% - var(--banner-height)); background: #F7F7FA; border-right: 1px solid var(--line); }
@@ -117,6 +122,14 @@ h1, h2, h3 { letter-spacing: -.025em; color: #20212A; }
 .category-legend.large i { width: .9rem; height: .9rem; }
 .category-legend summary { cursor: pointer; list-style: none; }
 .category-legend details p { font-size: .8rem; color: #555763; margin: .4rem 0; }
+/* Aides et exemples réservés à Format & son. */
+.format-cards .kpi-values > div:nth-child(2) .kpi-value { color: #167C80; }
+.format-reading { border-left: 3px solid #C9C4E8; background: #F8F8FB; padding: 12px 16px; font-size: .88rem; color: #555763; }
+.format-reading b { color: #4E4598; font-size: .85rem; }
+.format-reading p { margin: 4px 0 0; line-height: 1.55; }
+.format-example { padding: 10px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; font-size: .9rem; }
+.format-example > span { display: inline-block; color: #6153AD; font-size: .8rem; margin-right: 10px; }
+.format-example small { display: block; color: var(--muted); margin-top: 4px; }
 @media (max-width: 767px) {
  :root { --banner-height: 72px; }
  .brand-banner { padding: 0 22px 0 58px; }

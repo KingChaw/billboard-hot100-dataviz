@@ -1,9 +1,13 @@
-// Vérification visuelle locale ; nécessite Chrome --remote-debugging-port=9226.
+// Vérification locale. BILLBOARD_CDP_PORT et BILLBOARD_URL permettent un Chrome isolé.
 import fs from 'node:fs/promises';
 import assert from 'node:assert/strict';
-const pages=await (await fetch('http://127.0.0.1:9226/json')).json();
-const page=pages.find(p=>p.type==='page'&&p.url.startsWith('http://127.0.0.1:8502'));
-if(!page) throw Error('Ouvrir http://127.0.0.1:8502 dans le Chrome de vérification.');
+const mode=process.argv[2]||'suite';
+const baseUrl=process.env.BILLBOARD_URL||'http://127.0.0.1:8502';
+const directory=mode==='origins'?'livrables/origines-tests':'livrables/captures';
+await fs.mkdir(directory,{recursive:true});
+const pages=await (await fetch(`http://127.0.0.1:${process.env.BILLBOARD_CDP_PORT||9226}/json`)).json();
+const page=pages.find(p=>p.type==='page'&&p.url.startsWith(baseUrl));
+if(!page) throw Error(`Ouvrir ${baseUrl} dans le Chrome de vérification.`);
 const ws=new WebSocket(page.webSocketDebuggerUrl);
 await new Promise(r=>ws.addEventListener('open',r,{once:true}));
 let id=0;const pending=new Map();
@@ -21,23 +25,74 @@ const select=async(key,text)=>{
  if(!chosen)throw Error(`Option absente: ${key} ${text}: ${options}`);
  await evaluate(`[...document.querySelectorAll('[role="option"]')].find(e=>e.innerText===${JSON.stringify(chosen)}).click()`);await settle();
 };
-const routeGroups=[['summary'],['format_trend','duration','intro','sound','central','presence','genres'],['origin_trend','origins','map'],['ages','formats','teams','reuse'],['data_a','data_b']];
+const routeGroups=[['summary'],['format_trend','duration','sound','instrumentation','genres'],['origins','map'],['ages','formats','teams','reuse'],['data_a','data_b']];
 const go=async route=>{
+ route=({intro:'duration',central:'instrumentation',presence:'instrumentation'})[route]||route;
  const group=routeGroups.findIndex(routes=>routes.includes(route));
  await click(`.st-key-group_${group} button`);
  await click(`.st-key-nav_${route} button`);
 };
 const dimensions=async(width,height)=>{await send('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:width<768});await settle();};
-const shot=async name=>{const s=await send('Page.captureScreenshot',{format:'png'});await fs.writeFile(`livrables/captures/${name}.png`,Buffer.from(s.data,'base64'));};
+const shot=async name=>{const s=await send('Page.captureScreenshot',{format:'png'});await fs.writeFile(`${directory}/${name}.png`,Buffer.from(s.data,'base64'));};
 const measure=()=>evaluate(`(()=>{const m=document.querySelector('[data-testid="stMain"]');const f=document.querySelector('.js-plotly-plot');return {title:document.querySelector('h1')?.innerText,width:innerWidth,height:innerHeight,mainWidth:m.clientWidth,scrollWidth:m.scrollWidth,scrollHeight:m.scrollHeight,scrollTop:m.scrollTop,charts:document.querySelectorAll('.js-plotly-plot').length,errors:[...document.querySelectorAll('[data-testid="stException"]')].map(e=>e.innerText),chart:f?f.getBoundingClientRect().toJSON():null}})()`);
-const mode=process.argv[2]||'suite';
 try {
  await send('Page.bringToFront');
  await dimensions(1440,900);
  // Chaque parcours repart d’une session neuve, avec la référence 2020–2024.
  await send('Page.reload',{ignoreCache:true});await new Promise(r=>setTimeout(r,1700));
  const reports=[];
- if(mode==='scenario'){
+ if(mode==='origins'){
+  const record=async(name,width,charts)=>{
+   const m=await measure();
+   assert.equal(m.width,width);
+   assert.equal(m.errors.length,0);
+   assert.equal(m.charts,charts);
+   assert(m.scrollWidth<=m.mainWidth+1,`${name}/${width} dépasse horizontalement`);
+   reports.push({scenario:name,...m});
+   await shot(`${name}-${width}`);
+   if(charts){
+    await evaluate(`document.querySelector('.js-plotly-plot').scrollIntoView({block:'center'})`);await settle();
+    await shot(`${name}-${width}-graphique`);
+   }
+   console.log(`${name} · ${width} px : contrôle réussi.`);
+  };
+  for(const width of [1440,390,320]){
+   await dimensions(width,width===1440?900:844);
+   await go('origins');
+   if(width<768){
+    await evaluate(`(()=>{const s=document.querySelector('[data-testid="stSidebar"]');if(s&&getComputedStyle(s).visibility!=='hidden'&&s.getBoundingClientRect().x>=0)s.querySelector('[data-testid="stSidebarCollapseButton"] button')?.click();})()`);await settle();
+   }
+   await radio('origins_view','Évolution');
+   const curves=await evaluate(`document.querySelector('.js-plotly-plot').data.map(t=>({name:t.name,type:t.type,connectgaps:t.connectgaps}))`);
+   assert.deepEqual(curves.map(t=>t.name),['Uniquement États-Unis','Mixte','Uniquement hors États-Unis']);
+   assert(curves.every(t=>t.type==='scatter'&&t.connectgaps===false));
+   await record('origines-evolution',width,1);
+   await radio('origins_view','Composition');
+   assert.deepEqual(await evaluate(`document.querySelector('.js-plotly-plot').layout.xaxis.ticktext`),['2000 – 2009','2020 – 2024']);
+   assert(await evaluate(`document.querySelector('.js-plotly-plot').data.every(t=>t.type==='bar'&&t.x.length===2)`));
+   await record('origines-composition',width,1);
+   await go('map');await select('map_country','Tous');
+   assert(await evaluate(`document.querySelector('.js-plotly-plot').data.every(t=>t.type==='bar'&&t.orientation==='h')`));
+   await record('pays-comparaison',width,1);
+   await select('map_country','Porto Rico');
+   assert(await evaluate(`document.querySelector('[data-testid="stMain"]').innerText.includes('Porto Rico · part des titres n°1')`));
+   await record('porto-rico',width,0);
+   await go('origins');
+   assert(await evaluate(`[...document.querySelectorAll('.st-key-origins_view label')].some(e=>e.innerText==='Composition'&&e.querySelector('input')?.checked)`));
+   await go('map');
+   assert(await evaluate(`document.querySelector('.st-key-map_country').innerText.includes('Porto Rico')`));
+   assert.equal((await measure()).charts,0);
+  }
+  // Avec A vide puis les deux sélections vides, garder les deux libellés et aucune erreur.
+  await dimensions(1440,900);
+  await select('decade_a','1958 – 1959');
+  await select('genre','Non renseigné');
+  await record('pays-periode-etudiee-vide',1440,0);
+  assert(await evaluate(`document.querySelector('[data-testid="stMain"]').innerText.includes('Non disponible')`));
+  await select('decade_b','1958 – 1959');
+  await go('origins');await radio('origins_view','Composition');
+  await record('composition-deux-periodes-vides',1440,1);
+ } else if(mode==='scenario'){
   await select('decade_a','2010 – 2019');
   await click('.st-key-shortcut_intro button');
   assert((await evaluate('document.body.innerText')).includes('10 à 11 s'));
@@ -80,7 +135,7 @@ try {
   assert.equal(await evaluate(`document.querySelector('.category-legend details').open`),false);
   reports.push({touchLegend:true});
  } else {
-  const routes=['summary','format_trend','duration','intro','sound','central','presence','genres','origin_trend','origins','map','ages','formats','teams','reuse','data_a','data_b'];
+  const routes=['summary','format_trend','duration','sound','instrumentation','genres','origins','map','ages','formats','teams','reuse','data_a','data_b'];
   for(const width of [1440,390,320]){
    await dimensions(width,width===1440?900:844);
    for(const route of routes){
@@ -99,7 +154,7 @@ try {
   await dimensions(1440,900);
   await go('teams');await radio('teams_view','Évolution par décennie');await shot('apres-equipes-evolution');
   await go('reuse');await radio('reuse_view','Évolution par décennie');await shot('apres-reutilisation-evolution');
-  await go('map');await radio('country_view','Comparaison des périodes');await shot('apres-pays-comparaison');
+  await go('map');await select('map_country','Tous');await shot('apres-pays-comparaison');
   await select('map_country','Porto Rico');await shot('apres-porto-rico');
   reports.push({territory:await evaluate(`document.querySelector('[data-testid="stMain"]').innerText`)});
   await go('origins');
@@ -108,6 +163,6 @@ try {
   }
   await send('Emulation.setEmulatedVisionDeficiency',{type:'none'});
  }
- await fs.writeFile(`livrables/verification-navigateur-${mode}.json`,JSON.stringify(reports,null,2));
+ await fs.writeFile(mode==='origins'?`${directory}/verification-navigateur.json`:`livrables/verification-navigateur-${mode}.json`,JSON.stringify(reports,null,2));
  console.log(`${mode}: ${reports.length} observations enregistrées, contrôles réussis.`);
 } finally {ws.close();}

@@ -7,7 +7,7 @@ import streamlit as st
 
 from periods import period_labels, difference_label, export_slug
 from charts import CATEGORY_COLORS
-from dashboard_data import FEATURING, METRICS, CREDITS, comparison_rows
+from dashboard_data import FEATURING, METRICS, FORMAT_METRICS, CREDITS, comparison_rows, quartile_examples
 
 
 def number(value, digits=1):
@@ -126,6 +126,49 @@ def numeric_table(frames, column, unit):
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
 
+def format_cards(frames, columns):
+    """Cartes et alertes de couverture pour les seules pages Format & son."""
+    cards = []
+    for column in columns:
+        label, unit = FORMAT_METRICS[column]
+        title, values, foot = median_card(frames, column, label + " · médiane", unit,
+                                         is_duration=column == "length_sec")
+        if column == "intro_ratio":
+            foot = foot.replace(" % (", " points (")
+        if unit == "score / 100":
+            values = [value.replace(" score / 100", " / 100") for value in values]
+            foot = foot.replace(" score / 100 (", " points de score (")
+        cards.append((title, values, foot))
+    kpi_cards(cards, frames, tone="format-cards")
+    for name, data in zip(period_labels(frames).values(), frames.values()):
+        small = [f"{FORMAT_METRICS[c][0]} : {data[c].count()}" for c in columns if 0 < data[c].count() < 10]
+        if small:
+            st.warning(name + " · moins de 10 valeurs exploitables (" + ", ".join(small) + "). Prudence.")
+
+
+def reading_note(text):
+    st.markdown('<aside class="format-reading"><b>Comment lire</b><p>' + escape(text) + '</p></aside>',
+                unsafe_allow_html=True)
+
+
+def format_examples(frames, column):
+    """Écoute contextuelle compacte, sans reconstruire la table de Données."""
+    label, unit = FORMAT_METRICS[column]
+    st.markdown("**Quelques titres pour situer les écarts**")
+    period = st.radio("Période des exemples", list(frames), format_func=period_labels(frames).get,
+                      key="format_examples_period", horizontal=True)
+    examples = quartile_examples(frames[period], column)
+    if not examples:
+        st.caption("Aucune valeur exploitable pour proposer un exemple dans cette période.")
+    for row in examples:
+        value = duration(row["value"]) if column == "length_sec" else number(row["value"]) + " " + unit
+        st.markdown('<div class="format-example"><span>' + escape(row["repère"]) + '</span><b>'
+                    + escape(str(row["song"]).strip()) + '</b> · ' + escape(str(row["artist"]))
+                    + '<small>' + escape(label + " : " + value + " · cible : " + number(row["cible"]) + " " + unit)
+                    + '</small></div>', unsafe_allow_html=True)
+    st.caption("Titres les plus proches des quartiles de cette sélection ; jusqu’à trois titres distincts. Aucun jugement de qualité.")
+
+
 def shares_summary(data, frames, order):
     table = comparison_rows(data, frames, order)
     notes = []
@@ -142,7 +185,7 @@ def simple_comparison(data, frames, order, first_column):
     table = comparison_rows(data, frames, order)
     st.dataframe(pd.DataFrame({
         first_column: table["Indicateur"],
-        **{name: [f"{number(p)} % ({c} titre{"s" if c > 1 else ""})" for p, c in zip(table[f"{x} (%)"], table[f"{x} · titres concernés"])]
+        **{name: [f"{number(p)} % ({c} titre{'s' if c > 1 else ''})" for p, c in zip(table[f"{x} (%)"], table[f"{x} · titres concernés"])]
            for x, name in zip("AB", period_labels(frames).values())},
         "Écart (points)": [f"{sign(v)}" if pd.notna(v) else "Non disponible" for v in table["B − A (points)"]]}),
         hide_index=True, width="stretch")

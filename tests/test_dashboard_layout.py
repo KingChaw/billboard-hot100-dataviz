@@ -10,7 +10,7 @@ import streamlit as st
 from streamlit.testing.v1 import AppTest
 
 from periods import date_label, period_labels, display_comparison
-from test_regression import ROOT, ROUTES, go_to
+from test_regression import ROOT, ROUTES, ROUTE_CASES, go_to
 
 
 class DashboardLayout(unittest.TestCase):
@@ -24,19 +24,28 @@ class DashboardLayout(unittest.TestCase):
         self.app.selectbox(key='genre').set_value('Pop').run()
         go_to(self.app, 'intro')
         self.app.button(key='group_2').click().run()
-        self.assertEqual(self.app.session_state['route'], 'origin_trend')
+        self.assertEqual(self.app.session_state['route'], 'origins')
+        self.app.radio(key='origins_view').set_value('Composition').run()
+        self.app.button(key='nav_map').click().run()
+        self.app.selectbox(key='map_country').set_value('Porto Rico').run()
         self.app.button(key='group_1').click().run()
-        self.assertEqual(self.app.session_state['route'], 'intro')
+        self.assertEqual(self.app.session_state['route'], 'duration')
         self.assertEqual(self.app.selectbox(key='genre').value, 'Pop')
         self.assertEqual([b.key for b in self.app.button if b.key.startswith('nav_')],
-                         ['nav_' + r for r in ROUTES[:7]])
+                         ['nav_' + r for r in ROUTES[:5]])
+        self.app.button(key='group_2').click().run()
+        self.assertEqual(self.app.session_state['route'], 'map')
+        self.assertEqual(self.app.selectbox(key='map_country').value, 'Porto Rico')
+        self.app.button(key='nav_origins').click().run()
+        self.assertEqual(self.app.radio(key='origins_view').value, 'Composition')
+        self.assertEqual(self.app.selectbox(key='genre').value, 'Pop')
 
     def test_dates_on_all_pages_and_comparison_tables(self):
         self.app.selectbox(key='decade_a').set_value(2010).run()
         forbidden = re.compile(r'Période A|Référence B|A/B|B − A|\ben A\b|\ben B\b|\bA et B\b')
-        for route in ['summary', *ROUTES, 'data_a', 'data_b']:
-            with self.subTest(route=route):
-                go_to(self.app, route)
+        for route, view in [('summary', None), *ROUTE_CASES, ('data_a', None), ('data_b', None)]:
+            with self.subTest(route=route, view=view):
+                go_to(self.app, route, origins_view=view)
                 self.assertFalse(self.app.exception)
                 visible = ' '.join(x.value for x in self.app.markdown)
                 self.assertIsNone(forbidden.search(visible))
@@ -67,10 +76,19 @@ class DashboardLayout(unittest.TestCase):
         self.assertEqual([t['name'] for t in boxes],
                          ['2020 – 2024 · étudiée', '2020 – 2024 · référence'])
         self.assertEqual(boxes[0]['median'], boxes[1]['median'])
-        go_to(self.app, 'origins')
+        go_to(self.app, 'origins', origins_view='Composition')
         spec = json.loads(self.app.get('plotly_chart')[0].proto.spec)
-        self.assertEqual(len(spec['layout']['yaxis']['ticktext']), 2)
-        self.assertEqual(spec['data'][0]['customdata'][0][2], '2020 – 2024 · étudiée')
+        expected = ['2020 – 2024 · étudiée', '2020 – 2024 · référence']
+        self.assertEqual(spec['layout']['xaxis']['ticktext'], expected)
+        self.assertEqual(len(spec['data']), 3)
+        for trace in spec['data']:
+            self.assertEqual(trace['type'], 'bar')
+            self.assertEqual(trace['x'], ['Période A', 'Référence B'])
+            self.assertEqual(trace['y'][0], trace['y'][1])
+            self.assertEqual([row[2] for row in trace['customdata']], expected)
+            self.assertEqual([row[1] for row in trace['customdata']], [81, 81])
+        for i in [0, 1]:
+            self.assertAlmostEqual(sum(trace['y'][i] for trace in spec['data']), 100)
         go_to(self.app, 'data_b')
         self.assertNotEqual(self.app.button(key='nav_data_a').label,
                             self.app.button(key='nav_data_b').label)

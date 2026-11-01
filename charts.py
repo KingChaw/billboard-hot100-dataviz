@@ -11,7 +11,7 @@ import streamlit.components.v1 as components
 from analysis import binary_shares, category_shares
 from dashboard_data import ORIGINS, AXES
 from theme import COLORS, FONT
-from periods import period_labels
+from periods import period_labels, difference_label
 
 PERIODS = list(COLORS)
 CATEGORY_COLORS = {
@@ -40,7 +40,12 @@ def style(fig, height=430):
 
 def render(fig, key, height=None):
     # Hauteur fixe : pas de mesure de la fenêtre, donc pas de cadre de mesure ni de défilement.
-    viewport = {"height": height, "width": 1200} if height else _viewport(page=key, key="chart_viewport", default={"height": 430, "width": 1200})
+    viewport_key = f"chart_viewport_{key}" if key.startswith("format_") else "chart_viewport"
+    viewport = {"height": height, "width": 1200} if height else _viewport(page=key, key=viewport_key, default={"height": 430, "width": 1200})
+    if key.startswith("format_") and not height:
+        # Plusieurs figures sur une page : une hauteur stable évite les sauts
+        # de lecture et de cible de survol lors des mesures après défilement.
+        viewport = {**viewport, "height": 430}
     fig.update_layout(height=height or max(380, viewport["height"]))
     if fig.layout.barmode == "group":
         categories = len(fig.layout.yaxis.categoryarray or [])
@@ -57,6 +62,16 @@ def render(fig, key, height=None):
             fig.update_xaxes(tickangle=-55 if viewport["width"] < 400 else -35,
                              ticks="outside", ticklen=6, tickcolor="rgba(0,0,0,0)")
             fig.update_layout(margin_b=65)
+        if key.startswith("format_"):
+            if key.endswith("history"):
+                fig.update_xaxes(tickangle=-55 if viewport["width"] < 400 else -35, title=None)
+                fig.update_layout(margin_b=85)
+                fig.update_layout(legend=dict(y=1.02, font_size=10))
+            if fig.layout.barmode == "group":
+                fig.update_yaxes(ticktext=["<br>".join(textwrap.wrap(label, width=14, break_long_words=False))
+                                          for label in fig.layout.yaxis.categoryarray])
+                fig.update_traces(texttemplate="%{x:.0f} %", selector=dict(type="bar"))
+                fig.update_layout(margin_t=90)
     st.plotly_chart(fig, key=f"chart_{key}", use_container_width=True, theme=None,
                     config={"displayModeBar": False, "responsive": True, "scrollZoom": False,
                             "topojsonURL": "app/static/"})
@@ -147,6 +162,20 @@ def binary_frame(frames, columns):
     return data
 
 
+def genre_frame(frames):
+    """Genres A/B : une période entièrement inconnue ne devient pas un zéro musical."""
+    data = share_frame(frames, "genres")
+    order = sorted(set(data["catégorie"]) | {"Non renseigné"})
+    data = aligned_shares(data, frames, order)
+    for period, frame in frames.items():
+        valid = int(frame.genres.map(lambda g: g != ["Non renseigné"]).sum())
+        musical = data["période"].eq(period) & data["catégorie"].ne("Non renseigné")
+        data.loc[musical, "renseignés"] = valid
+        if not valid:
+            data.loc[musical, "part"] = np.nan
+    return data
+
+
 def aligned_shares(data, frames, order):
     parts = []
     for period in PERIODS:
@@ -192,6 +221,36 @@ def bars(data, frames, order):
     share_axes(fig, order)
     fig.update_layout(barmode="group", bargap=.2)
     fig.update_xaxes(range=[0, 112])
+    return fig
+
+
+def format_bars(data, frames, order):
+    """Comparaison instrument/genre : parts, effectifs et écarts au même survol."""
+    from dashboard_data import comparison_rows
+    aligned = aligned_shares(data, frames, order)
+    comparison = comparison_rows(data, frames, order).set_index("Indicateur")
+    fig = bars(data, frames, order)
+    for trace, period in zip(fig.data, PERIODS):
+        d = aligned[aligned["période"].eq(period)].copy()
+        d["delta"] = d["catégorie"].map(comparison["B − A (points)"])
+        d["delta_label"] = d.delta.map(lambda v: (f"{v:+.1f}".replace(".", ",") + " points") if pd.notna(v) else "Non disponible")
+        trace.customdata = d[["effectif", "total", "renseignés", "delta_label"]]
+        trace.texttemplate = "%{x:.1f} % · n=%{customdata[0]}"
+        trace.hovertemplate = (period_labels(frames)[period] + " · %{y}<br>%{x:.1f} %"
+                               + "<br>%{customdata[0]:.0f} / %{customdata[1]} titres"
+                               + "<br>%{customdata[2]} renseignés<br>Écart : %{customdata[3]} ("
+                               + difference_label(frames) + ")<extra></extra>")
+    fig.update_xaxes(range=[0, 140])
+    return fig
+
+
+def genre_trend(data, genre, years_a, years_b):
+    fig = trend(data, "%", years_a, years_b, median=False, y_title="Titres n°1 (%)")
+    trace = fig.data[-1]
+    trace.customdata = data[["label", "count", "total", "valid"]]
+    trace.hovertemplate = ("%{customdata[0]}<br>%{y:.1f} %<br>%{customdata[1]} / %{customdata[2]} titres"
+                           + "<br>%{customdata[3]} genres exploitables<extra></extra>")
+    trace.name = genre
     return fig
 
 
