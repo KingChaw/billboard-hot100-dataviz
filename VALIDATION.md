@@ -1,7 +1,185 @@
-# Correction des tests Origines — 1er novembre 2026
+# Finalisation UX du dashboard — 1er novembre 2026
+
+Cette section décrit l’état actuel ; les sections suivantes documentent les
+interventions antérieures conservées dans le même worktree non commité.
+
+## Changements et périmètre
+
+- Rubrique principale **Explorer les n°1**, route `summary` et grand titre
+  inchangés. Le nom **Vue d’ensemble** de Format reste inchangé.
+- Accueil sans sous-navigation Synthèse ; les trois titres et trois frises
+  originaux (5 + 2 + 4 étapes) sont identiques par comparaison AST. Le bloc
+  Repères chiffrés et tout son contenu après la troisième partie sont retirés.
+- Navigation sticky unique et commune aux cinq rubriques ; deux niveaux lorsque
+  plusieurs sous-pages existent, un seul sur l’accueil. Défilement horizontal
+  interne des barres sur mobile, sans espace de sous-navigation vide à l’accueil.
+- Phrase historique récurrente et variantes directement équivalentes retirées,
+  sans modifier les calculs, filtres, bornes temporelles, points partiels ou survols.
+- Correctif minimal d’un défaut préexistant observé à 320 px : Haut recouvrait
+  partiellement le CSV. Placement dans le flux sur les deux pages Données,
+  comme dans Format. Retour en haut et téléchargement restent disponibles.
+
+## Vérifications
+
+- Avant modification : **53/53 tests Python**.
+- Après le dernier correctif CSS : **56/56 tests**, aucun ignoré ou désactivé.
+  Les 53 noms de tests sont conservés ; trois nouveaux tests dans
+  `tests/test_final_ux.py`. Assertions obsolètes actualisées : accueil atteint
+  par la navigation principale, anciens boutons après la partie 3 retirés,
+  effectifs 129/81 contrôlés dans la barre latérale. Tous les raccourcis Format
+  restants et leurs filtres restent testés ; aucune assertion statistique supprimée.
+- **42 scénarios analytiques comparés avant/après**, tous identiques pour les
+  figures JSON complètes, tableaux numériques/HTML et filtres. Les guides sont
+  identiques sauf la phrase explicitement retirée de Signature sonore, dont la
+  suppression précise est prise en compte dans la comparaison.
+- Chrome **156.0.8078.74** réel, serveur 8505, profil isolé CDP 9229 :
+  **15 observations initiales**, **63 observations principales après**, puis
+  **six contrôles Données après correction** aux tailles **320×844, 390×844 et
+  1440×900**. Les observations sont issues de sessions successives documentées.
+- Les 14 pages, cinq variantes Format, navigation souris/Entrée, mémoire des
+  sous-pages et filtre Pop/1980 sont contrôlés à chaque largeur. Les graphiques
+  Format conservent leurs dimensions et largeurs utiles ; les KPI de durée
+  restent sur une ligne. Aucun débordement horizontal de page, exception
+  Streamlit ou chevauchement des barres observé dans les contrôles finaux.
+- Les six contrôles Données défilent réellement les tableaux et téléchargent
+  les CSV dans le dossier local de recette. Colonnes, ordre et valeurs sont
+  comparés à la sélection attendue (129 et 81 titres), sans toucher aux CSV bruts.
+
+Quand le contenu tient dans la fenêtre, il n’y a pas de défilement vertical de
+page à provoquer : navigation visible et règle sticky contrôlées, défilement
+du tableau Données vérifié séparément. Aucune page longue simulée.
+
+Accueil, hauteur à filtres identiques :
+
+| Largeur | Avant | Après |
+|---|---:|---:|
+| 320 px | 4 533 px | 1 779 px |
+| 390 px | 3 914 px | 1 322 px |
+| 1440 px | 2 354 px | 900 px (tient dans la fenêtre) |
+
+## Intégrité et preuves
+
+Worktree `/private/tmp/billboard-hot100-format-son-ux`, branche `refonte-format-son`,
+HEAD toujours `ef4a5bc`. Modifications UX précédentes conservées, `c08a252` exclu.
+Les fichiers `analysis.py`, `dashboard_data.py`, `charts.py`, `ui.py`, les deux
+CSV, les composants et dépendances sont identiques à l’état initial de cette
+mission. Le clone initial conserve sa branche, son état Git et ses 359 empreintes.
+Aucun commit, push, merge, reset, rebase ou cherry-pick effectué.
+
+[Bilan](livrables/format-son-ux/finalisation/BILAN.md),
+[captures](livrables/format-son-ux/finalisation/CAPTURES.md),
+[tests avant](livrables/format-son-ux/finalisation/tests-avant.log),
+[tests après](livrables/format-son-ux/finalisation/tests-apres.log),
+[Chrome principal](livrables/format-son-ux/finalisation/apres-chrome.json),
+[Chrome Données](livrables/format-son-ux/finalisation/tables-chrome.json),
+[intégrité](livrables/format-son-ux/finalisation/integrite.json).
+
+Limites : viewports mobiles émulés dans Chrome du Mac, sans téléphone physique
+ni VoiceOver. Les journaux intermédiaires gardent les erreurs de recette
+(événement Entrée/focus de recherche et attente des anciennes cartes), corrigées
+avant les résultats finaux ; ils ne sont pas comptés comme des réussites.
+
+---
+
+# Simplification UX de Format & son — validation antérieure du 1er novembre 2026
+
+Cette section décrit l’intervention précédente. Les validations ci-dessous sont
+conservées comme historique de la base `ef4a5bc`.
+
+## Périmètre et intégrité
+
+Worktree isolé : `/private/tmp/billboard-hot100-format-son-ux`, branche
+`refonte-format-son`, HEAD `ef4a5bc54fffeaee83a37d38819e44fd2c2c7ead`.
+`c08a252` n’appartient pas à son historique. Le clone initial demeure sur
+`suite-refonte-profils-creation` à `c08a252`, avec le même état Git et les mêmes
+359 empreintes de fichiers, y compris ses livrables non suivis.
+Aucun commit, push, merge, rebase, reset ou cherry-pick effectué.
+
+Les deux CSV, `analysis.py`, `dashboard_data.py`, `periods.py`, les conventions
+de crédits, les composants de navigation/viewport, les dépendances et
+`.gitignore` sont identiques à la base par SHA-256. Les changements hors Format
+se limitent à l’habillage des six appels de guides existants : aucun texte
+réécrit et aucun guide ajouté. Comparaison de **20 scénarios AppTest hors
+Format** avant/après : textes, messages, figures JSON, tableaux, filtres et
+boutons identiques, avec deux réglages de genre/années.
+
+## Tests Python
+
+```bash
+PYTHONPYCACHEPREFIX=/private/tmp/billboard-pycache python3 -m unittest discover -s tests -v
+```
+
+- Avant : **47 tests réussis sur 47**.
+- Après : **53 tests réussis sur 53**, aucun test ignoré ou désactivé.
+- Les **47 noms de tests initiaux** sont conservés ; six tests UX sont ajoutés
+  dans `tests/test_format_ux.py` (modes et mesures, persistance, vocabulaire et
+  filtres, autres rubriques, Détails/exports, sélections vides/mesures manquantes).
+- Attentes d’interface actualisées dans `test_format_sound.py`,
+  `test_regression.py` et `test_improvements.py` : un graphique principal,
+  accès explicite à l’historique, colonne « Années couvertes », valeurs sans
+  commentaire automatique et infobulles sans écart. Vérifications statistiques
+  des valeurs, ratios individuels, quartiles, manques et dénominateurs conservées.
+
+Journaux : [avant](livrables/format-son-ux/tests-avant.log),
+[après](livrables/format-son-ux/tests-apres.log),
+[inventaire des tests conservés](livrables/format-son-ux/tests-conserves.json).
+
+## Chrome réel et mesures
+
+Chrome **156.0.8078.74**, profil de test isolé, CDP **9229**, Streamlit **8505**.
+**15 observations avant, 56 observations après**, aux dimensions **320×844,
+390×844 et 1440×900**. Trois observations supplémentaires comparent les styles
+calculés des guides Format/Âge : mêmes fond, bordure, padding, police,
+interligne, marges et titre à chaque largeur.
+
+Les cinq pages et cinq variantes sont contrôlées à chaque largeur, avec accès
+réel à Données B après filtre Pop (36 lignes), une puis deux sélections vides,
+historique Non renseigné, clic souris sur la navigation fixe, molette, choix
+de mesure et de graphique au clavier. Deux survols réels à 1440 px vérifient
+118 BPM et 81/81 exploitables, puis 28/81 titres et la couverture de Guitare,
+sans écart affiché. Persistance et toutes les mesures sont aussi testées en Python.
+Aucune exception Streamlit ni débordement horizontal observé ; largeur utile
+minimale des graphiques **153 px** ; valeurs des KPI de durée sur une ligne aux
+trois tailles. Les titres sont sous la navigation au début de chaque page.
+
+Comparaison à filtres identiques, modes par défaut et Détails fermé :
+
+| Largeur | Baisse de hauteur des cinq pages | Baisse de distance de défilement |
+|---|---:|---:|
+| 320 px | 31,4 à 54,4 % | 52,5 à 72,4 % |
+| 390 px | 27,5 à 52,8 % | 48,6 à 72,1 % |
+| 1440 px | 16,4 à 56,0 % | 38,3 à 84,3 % |
+
+Défauts rencontrés et corrigés : fixation appliquée au bon conteneur Streamlit,
+bouton Haut replacé dans le flux Format pour éviter les recouvrements mobiles,
+dates historiques alternées sans déplacer les points, singulier « 1 titre » et
+message unique pour deux sélections vides. Les tests ont été relancés après la
+dernière modification de style des guides. Les historiques et tous les modes
+restent accessibles ; les hauteurs finales incluent le bouton Haut.
+
+`tests/format_browser_qa.mjs` délègue à la recette complète
+`tests/format_ux_browser_qa.mjs` (argument `apres`, ou `guides` directement dans
+la nouvelle recette). Les contrôles précédents sont adaptés à l’affichage
+interactif et à la suppression demandée des écarts ; les survols restent exécutés.
+
+[Bilan complet](livrables/format-son-ux/BILAN.md),
+[mesures détaillées](livrables/format-son-ux/HAUTEURS.md),
+[captures](livrables/format-son-ux/CAPTURES.md),
+[observations Chrome finales](livrables/format-son-ux/apres-navigateur.json),
+[styles calculés des guides](livrables/format-son-ux/guides-navigateur.json),
+[intégrité](livrables/format-son-ux/integrite.json).
+
+Limites : viewports mobiles émulés dans Chrome du Mac, sans essai sur téléphone
+physique ni VoiceOver. La recette Chrome couvre les modes principaux ; les
+combinaisons exhaustives de mesures sont couvertes en Python. Les anciens
+journaux intermédiaires ne constituent pas la recette finale.
+
+---
+
+# Correction des tests Origines — validation historique du 1er novembre 2026
 
 **Suite complète : 47 tests sur 47 réussis**, dont les **15 tests Format & son**.
-Cette section décrit la dernière intervention ; les sections suivantes conservent
+Cette section décrit l’intervention antérieure ; les sections suivantes conservent
 les validations antérieures, y compris leurs échecs désormais corrigés.
 
 ## Périmètre et état initial

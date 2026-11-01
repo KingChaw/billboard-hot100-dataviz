@@ -231,7 +231,8 @@ class NewJourneys(unittest.TestCase):
         self.app.selectbox(key='decade_a').set_value(2010).run()
         self.go('intro')
         text=' '.join(x.value for x in self.app.markdown)
-        self.assertIn('10 à 11 s',text)
+        self.assertIn('10 s',text)
+        self.assertIn('11 s',text)
         self.go('data_b')
         with patch('streamlit.download_button',wraps=st.download_button) as download:
             self.app.text_input(key='search_data_b').input('cardigan').run()

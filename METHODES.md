@@ -78,9 +78,25 @@ Les distributions des deux périodes restent accessibles dans la même section.
 ## Format & son
 
 Les cinq vues séparent le panorama, la durée et l’introduction, la signature
-sonore, l’instrumentation et les genres. La synthèse générale du dashboard est
-conservée. Les anciens accès aux introductions et aux instruments redirigent
-vers leurs vues fusionnées, sans changer les filtres.
+sonore, l’instrumentation et les genres. L’accueil « Explorer les n°1 » présente
+les trois parcours analytiques ; la sous-page Format « Vue d’ensemble » garde
+son nom et sa fonction. Les anciens accès aux introductions et aux instruments redirigent
+vers leurs vues fusionnées, sans changer les filtres. Les sélecteurs affichent
+un graphique principal à la fois, sans retirer de mesure ou de mode d’analyse.
+Leur choix est conservé après navigation. La navigation fixe est commune à tout
+le dashboard : deux niveaux dans les rubriques à plusieurs sous-pages, un seul
+sur l’accueil. Routes et clés des filtres restent inchangées.
+
+La phrase récurrente de portée historique est retirée de l’interface, y compris
+ses variantes dans les guides et Détails. Cette suppression rédactionnelle ne
+change ni les courbes, ni leur filtre de genre, ni les observations partielles,
+ni les infobulles. Les conventions de calcul restent celles décrites ci-dessous.
+
+« Année » remplace « Période » uniquement dans cette interface : les mêmes
+plages, bornes inclusives et dénominateurs restent utilisés. Les écarts ne sont
+plus affichés dans les cartes, graphiques, survols ou tableaux de Format & son ;
+les deux valeurs et les effectifs restent consultables. Les fonctions de calcul
+des différences et leur affichage dans les autres rubriques restent inchangés.
 
 La **part de l’introduction** est calculée pour chaque titre :
 `intro_ratio = 100 * intro_length_sec / length_sec`, uniquement lorsque les deux
@@ -91,14 +107,15 @@ négative ou manquante, ou une introduction manquante, donne un ratio manquant.
 Les effectifs exploitables peuvent donc différer selon les trois mesures.
 Les durées médianes totales sont affichées en minutes et secondes ; les
 distributions restent en secondes. Les introductions sont en secondes, les
-ratios en %, leurs écarts en points de pourcentage.
+ratios en %. Les effectifs renseignés et les effectifs totaux sont distingués,
+y compris lorsque les deux sélections sont identiques ou vides.
 
 Les cinq caractéristiques sonores gardent leurs échelles propres : tempo en
 BPM, énergie/dansabilité/caractère acoustique en scores sur 100, niveau sonore
 en dB. Les scores ont une échelle graphique de 0 à 100 ; les dB conservent
 leurs valeurs négatives, sans imposer une origine à zéro. Aucun radar ni
-agrégat ne mélange ces grandeurs. Un écart entre médianes décrit deux
-distributions ; il ne démontre pas une évolution identique pour chaque titre.
+agrégat ne mélange ces grandeurs. Deux médianes décrivent deux distributions ;
+leur comparaison ne démontre pas une évolution identique pour chaque titre.
 
 L’**instrumentation** sépare le rôle central (voix, guitare, piano/claviers,
 basse) de la présence de cordes orchestrales ou cuivres/vents. Tous ces
@@ -121,11 +138,16 @@ distributions utilisent seulement les deux périodes choisies, alors que tous
 les historiques couvrent 1958–janvier 2025, avec ce même filtre global.
 
 Les exemples de Format & son se trouvent dans Détails et utilisent la mesure
-historique sélectionnée ainsi que la période d’exemples choisie. Les cibles
+du graphique sélectionné ainsi que la sélection d’exemples choisie. Les cibles
 Q1/médiane/Q3 sont calculées sur tous les titres filtrés de cette période ;
 les titres sont pris dans cette même sélection, sans doublon, par distance
 absolue à la cible, puis date, titre et artiste en cas d’égalité. Les raccourcis
 vers Données préservent les filtres et le fonctionnement de la recherche/export.
+Les tableaux de Détails conservent les médianes, quartiles et effectifs utiles
+à la lecture du graphique actif. Les guides visibles restent courts ; les
+définitions des sources, le ratio d’introduction et les limites des historiques
+restent accessibles dans ce volet. Un astérisque signale les décennies partielles
+1958–1959 et 2020–janvier 2025 sur les petits écrans.
 
 ## Artistes, collaborations, crédits
 

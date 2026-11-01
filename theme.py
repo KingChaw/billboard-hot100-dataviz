@@ -124,9 +124,29 @@ h1, h2, h3 { letter-spacing: -.025em; color: #20212A; }
 .category-legend details p { font-size: .8rem; color: #555763; margin: .4rem 0; }
 /* Aides et exemples réservés à Format & son. */
 .format-cards .kpi-values > div:nth-child(2) .kpi-value { color: #167C80; }
-.format-reading { border-left: 3px solid #C9C4E8; background: #F8F8FB; padding: 12px 16px; font-size: .88rem; color: #555763; }
+.format-reading, [class*="st-key-reading_existing_"] { border-left: 3px solid #C9C4E8; background: #F8F8FB; padding: 12px 16px; font-size: .88rem; color: #555763; }
 .format-reading b { color: #4E4598; font-size: .85rem; }
-.format-reading p { margin: 4px 0 0; line-height: 1.55; }
+.format-reading p, [class*="st-key-reading_existing_"] p { margin: 4px 0 0; line-height: 1.55; }
+[class*="st-key-reading_existing_"] [data-testid="stMarkdownContainer"] { font-size: .88rem; color: #555763; }
+[class*="st-key-reading_existing_"] p, [class*="st-key-reading_existing_"] li { font-size: .88rem; line-height: 1.55; }
+[class*="st-key-reading_existing_"] strong { color: #4E4598; }
+[class*="st-key-reading_existing_"] p:first-child > strong:first-child { font-size: .85rem; }
+[data-testid="stLayoutWrapper"]:has(> .st-key-dashboard_navigation) { position: sticky; top: var(--banner-height); z-index: 100; background: #FFFFFF; }
+.st-key-dashboard_navigation { gap: 0; box-shadow: 0 3px 5px rgba(36,38,49,.04); }
+.stApp:has(.st-key-dashboard_navigation) [data-testid="stMain"] { scroll-padding-top: calc(var(--banner-height) + 116px); }
+.stApp:has(.st-key-dashboard_navigation):not(:has(.st-key-secondary_nav)) [data-testid="stMain"] { scroll-padding-top: calc(var(--banner-height) + 58px); }
+.stApp:has(.st-key-group_1 button[kind="primary"]) .st-key-back_top,
+.stApp:has(.st-key-group_4 button[kind="primary"]) .st-key-back_top { position: static; margin-left: auto; }
+.format-cards { gap: 10px; }
+.format-cards .kpi { padding: 12px 16px; }
+.format-cards .kpi h3 { font-size: .85rem; margin: 0 0 6px; }
+.format-cards .kpi-values { gap: 10px; }
+.format-cards .kpi-value { margin: 2px 0; }
+.format-cards .kpi-count { display: block; color: var(--muted); font-size: .75rem; }
+.stApp:has(.st-key-nav_duration button[kind="primary"]) .format-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stApp:has(.st-key-nav_duration button[kind="primary"]) .format-cards .kpi-value { font-size: 1.05rem; white-space: nowrap; overflow-wrap: normal; }
+.stApp:has(.st-key-nav_format_trend button[kind="primary"]) .format-cards .kpi-value { font-size: 1.15rem; line-height: 1.25; white-space: nowrap; overflow-wrap: normal; }
+.stApp .format-chart-title { font-size: 1.3rem; font-weight: 650; padding: 6px 0 4px; margin: 0; line-height: 1.25; }
 .format-example { padding: 10px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; font-size: .9rem; }
 .format-example > span { display: inline-block; color: #6153AD; font-size: .8rem; margin-right: 10px; }
 .format-example small { display: block; color: var(--muted); margin-top: 4px; }
@@ -143,6 +163,8 @@ h1, h2, h3 { letter-spacing: -.025em; color: #20212A; }
  .kpi-grid { grid-template-columns: 1fr; }
  .kpi { padding: 18px; }
  .kpi-value { font-size: 1.4rem; }
+ .format-cards .kpi { padding: 10px 12px; }
+ .stApp:has(.st-key-nav_duration button[kind="primary"]) .format-cards { grid-template-columns: 1fr; }
 }
 </style>
 """

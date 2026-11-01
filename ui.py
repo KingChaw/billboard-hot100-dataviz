@@ -115,11 +115,11 @@ def numeric_summary(frames, column, label, unit):
         st.caption(" · ".join(notes))
 
 
-def numeric_table(frames, column, unit):
+def numeric_table(frames, column, unit, period_column="Période"):
     rows = []
     for period, data in frames.items():
         values = data[column].dropna()
-        rows.append({"Période": period_labels(frames)[period], "Unité": unit, "Médiane": values.median(),
+        rows.append({period_column: period_labels(frames)[period], "Unité": unit, "Médiane": values.median(),
                      "Q1": values.quantile(.25), "Q3": values.quantile(.75),
                      "Minimum": values.min(), "Maximum": values.max(),
                      "Exploitables": len(values), "Titres": len(data)})
@@ -127,23 +127,44 @@ def numeric_table(frames, column, unit):
 
 
 def format_cards(frames, columns):
-    """Cartes et alertes de couverture pour les seules pages Format & son."""
+    """Valeurs comparables et couverture, sans écarts affichés, pour Format & son."""
     cards = []
     for column in columns:
         label, unit = FORMAT_METRICS[column]
         title, values, foot = median_card(frames, column, label + " · médiane", unit,
                                          is_duration=column == "length_sec")
-        if column == "intro_ratio":
-            foot = foot.replace(" % (", " points (")
         if unit == "score / 100":
             values = [value.replace(" score / 100", " / 100") for value in values]
-            foot = foot.replace(" score / 100 (", " points de score (")
-        cards.append((title, values, foot))
-    kpi_cards(cards, frames, tone="format-cards")
+        cards.append((title, values, [f"{d[column].count()}/{len(d)} titres" for d in frames.values()]))
+    format_card_grid(cards, frames)
     for name, data in zip(period_labels(frames).values(), frames.values()):
         small = [f"{FORMAT_METRICS[c][0]} : {data[c].count()}" for c in columns if 0 < data[c].count() < 10]
         if small:
             st.warning(name + " · moins de 10 valeurs exploitables (" + ", ".join(small) + "). Prudence.")
+
+
+def format_card_grid(cards, frames):
+    html = '<div class="kpi-grid format-cards' + (' single' if len(cards) == 1 else '') + '">'
+    for title, values, counts in cards:
+        html += '<article class="kpi"><h3>' + escape(title) + '</h3><div class="kpi-values">'
+        for value, count, label, suffix in zip(values, counts, period_labels(frames).values(), ['a', 'b']):
+            html += ('<div><span class="period-label period-' + suffix + '">' + escape(label)
+                     + '</span><div class="kpi-value">' + escape(value)
+                     + '</div><small class="kpi-count">' + escape(count) + '</small></div>')
+        html += '</div></article>'
+    st.markdown(html + '</div>', unsafe_allow_html=True)
+
+
+def format_missing_genres(frames):
+    title, values, _ = share_card(frames, "Genres non renseignés", lambda d: d.genres.map(lambda g: g == ["Non renseigné"]))
+    counts = [f"{int(d.genres.map(lambda g: g == ['Non renseigné']).sum())}/{len(d)} titres" for d in frames.values()]
+    format_card_grid([(title, values, counts)], frames)
+
+
+def existing_reading(text, key):
+    """Habillage seul : préserver intégralement le Markdown hors Format & son."""
+    with st.container(key="reading_existing_" + key):
+        st.markdown(text)
 
 
 def reading_note(text):
@@ -154,8 +175,8 @@ def reading_note(text):
 def format_examples(frames, column):
     """Écoute contextuelle compacte, sans reconstruire la table de Données."""
     label, unit = FORMAT_METRICS[column]
-    st.markdown("**Quelques titres pour situer les écarts**")
-    period = st.radio("Période des exemples", list(frames), format_func=period_labels(frames).get,
+    st.markdown("**Titres repères**")
+    period = st.radio("Année des exemples", list(frames), format_func=period_labels(frames).get,
                       key="format_examples_period", horizontal=True)
     examples = quartile_examples(frames[period], column)
     if not examples:
@@ -166,7 +187,7 @@ def format_examples(frames, column):
                     + escape(str(row["song"]).strip()) + '</b> · ' + escape(str(row["artist"]))
                     + '<small>' + escape(label + " : " + value + " · cible : " + number(row["cible"]) + " " + unit)
                     + '</small></div>', unsafe_allow_html=True)
-    st.caption("Titres les plus proches des quartiles de cette sélection ; jusqu’à trois titres distincts. Aucun jugement de qualité.")
+    st.caption("Jusqu’à trois titres distincts proches de Q1, de la médiane et de Q3 du filtre actif.")
 
 
 def shares_summary(data, frames, order):

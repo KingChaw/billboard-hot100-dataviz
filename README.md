@@ -20,8 +20,13 @@ Aucune dépendance applicative supplémentaire.
 
 ## Utiliser
 
-- Navigation en haut du contenu : rubrique, puis sous-page. La dernière sous-page
-  de chaque rubrique est mémorisée. La colonne gauche contient uniquement les filtres.
+- Navigation fixe sous le bandeau dans toutes les rubriques : rubrique, puis
+  sous-page. La dernière sous-page de chaque rubrique est mémorisée. La colonne
+  gauche contient uniquement les filtres. Sur mobile, les deux barres défilent
+  horizontalement dans leur propre espace.
+- **Explorer les n°1** est l’accueil : titre « Quels repères offrent les titres
+  n°1 ? », puis les trois parcours numérotés Format, Origines, Profils et création.
+  Aucun sous-onglet Synthèse ni ancien bloc de repères chiffrés après la partie 3.
 - Au départ : **2000–2009 ; référence 2020–2024, 81 titres**. Le menu distingue
   **2020–janv. 2025, 82 titres**, partielle. Les intervalles personnalisés et les
   décennies conservent leurs réglages indépendants.
@@ -29,9 +34,11 @@ Aucune dépendance applicative supplémentaire.
   infobulles, tableaux et noms des CSV. Deux sélections identiques restent distinctes.
 - **Format & son** : cinq sous-pages, dans l’ordre **Vue d’ensemble**, **Durée &
   introduction**, **Signature sonore**, **Instrumentation**, **Genres musicaux**.
-  La synthèse générale reste indépendante de cette vue d’ensemble.
-  Quatre repères de comparaison, distributions séparées, historiques avec médiane
-  et Q1–Q3 ; un sélecteur conserve l’unité de chaque mesure.
+  Cette sous-page « Vue d’ensemble » conserve son nom. Un seul graphique
+  principal à la fois, avec des choix persistants : mesure de la vue d’ensemble,
+  **Durée / Introduction / Évolution**, mesure sonore puis **Distribution /
+  Évolution**, **Rôle central / Présence**, **Comparer les années / Historique**.
+  Les cartes conservent les deux valeurs et leurs effectifs, sans badges d’écart.
   Les instruments centraux et les sections présentes restent deux analyses distinctes.
   Les genres proposent une comparaison simultanée et une évolution historique ;
   « Non renseigné » est affiché à part, sans genre de remplacement.
@@ -41,7 +48,8 @@ Aucune dépendance applicative supplémentaire.
   pratiques ont une comparaison des périodes et une évolution par décennie.
 - Dans **Format & son → Détails**, jusqu’à trois exemples issus des titres filtrés,
   proches de Q1, de la médiane et de Q3 pour la mesure sélectionnée. Les raccourcis
-  vers **Données** conservent le genre et les périodes ; recherche et CSV y restent disponibles.
+  vers **Données** conservent le genre et les années ; recherche et CSV y restent disponibles.
+  Définitions, tableaux numériques et méthode sont regroupés dans ce même volet.
 - **Détails** pour méthode et approfondissements ; retour en haut disponible.
   Sur mobile, défilement vertical privilégié pour garder les textes lisibles.
 
@@ -50,7 +58,10 @@ compte une fois selon sa première semaine au n°1. Aucune prédiction de succè
 ou recommandation de recrutement. Les crédits composés non résolus restent
 indéterminés ; consulter l’audit avant d’interpréter les taux de collaboration.
 
-Dans Format & son, les cartes et distributions portent sur les deux périodes
+Dans Format & son, « Année » est un libellé d’interface : **2000–2009 reste une
+plage de dix années**. Les intervalles et calculs ne changent pas. Les effectifs
+s’affichent en titres et les écarts ne sont plus présentés dans cette rubrique.
+Les cartes et distributions portent sur les deux plages d’années
 sélectionnées. Les historiques utilisent **toutes les décennies du corpus avec
 le filtre de genre actif**, indépendamment des périodes de comparaison.
 La part d’introduction est la médiane de `100 * intro_length_sec / length_sec`
@@ -77,10 +88,21 @@ lancé avec un profil temporaire distinct et `--remote-debugging-port=9226`.
 Ce script de développement ne fait pas partie des dépendances de l’application.
 Voir [VALIDATION.md](VALIDATION.md) pour les vérifications réellement exécutées.
 
-Les contrôles spécifiques de la refonte sont dans `tests/test_format_sound.py`.
-Le script `tests/format_browser_qa.mjs` utilise un Chrome de test isolé sur le port
-9227 et ce clone servi sur 8504 ; il contrôle **320, 390 et 1440 px**. Résultats et
-captures : `livrables/format-son/`.
+Les contrôles spécifiques sont dans `tests/test_format_sound.py` et
+`tests/test_format_ux.py` et `tests/test_final_ux.py`. La suite actuelle comporte
+**56 tests** : les 53 tests de la simplification UX conservés et trois nouveaux
+contrats pour l’accueil, le nom des rubriques et les notes historiques retirées.
+`node tests/format_browser_qa.mjs apres` délègue à
+`tests/format_ux_browser_qa.mjs` : Chrome de test isolé sur **9229**, application
+sur **8505**, contrôles **320 × 844, 390 × 844 et 1440 × 900 px**. Les variables
+`BILLBOARD_CDP_PORT` et `BILLBOARD_URL` permettent de changer ces accès.
+Résultats avant/après et captures : `livrables/format-son-ux/`. L’ancien bilan
+dans `livrables/format-son/` reste une référence historique.
+`node tests/format_ux_browser_qa.mjs guides` compare aussi les styles calculés
+du guide Format de référence et d’un guide existant hors rubrique aux trois tailles.
+`node tests/final_browser_qa.mjs apres` contrôle la navigation fixe globale,
+l’accueil et la conservation des interactions aux trois dimensions ; ses
+captures et journaux sont dans `livrables/format-son-ux/finalisation/`.
 
 ## Fichiers
 
@@ -91,7 +113,11 @@ captures : `livrables/format-son/`.
 - `static/` : fond de carte local ; `data/` : sources brutes inchangées.
 - [METHODES.md](METHODES.md) : définitions et limites.
 - [Bilan Format & son](livrables/format-son/BILAN.md) : changements, fichiers,
-  résultats actuels et limites de la refonte du 1er novembre 2026.
+  résultats de la première refonte du 1er novembre 2026.
+- [Bilan de simplification UX](livrables/format-son-ux/BILAN.md) : nouvelle
+  présentation interactive, mesures avant/après et recette réellement exécutée.
+- [Finalisation UX](livrables/format-son-ux/finalisation/BILAN.md) : accueil
+  « Explorer les n°1 », navigation fixe globale et contrôles complémentaires.
 - [BILAN.md](livrables/BILAN.md) : suivi de toutes les recommandations.
 - [JOURNAL_COMPLEMENT.md](livrables/JOURNAL_COMPLEMENT.md) : rédaction à intégrer au
   journal du groupe et trame de soutenance ; sources et captures associées.
@@ -100,5 +126,5 @@ captures : `livrables/format-son/`.
 
 La refonte du dashboard reprend une navigation à deux niveaux et une colonne
 réservée aux filtres. Les calculs et données sont conservés. Les résultats actuels,
-y compris les échecs préexistants hors Format & son, sont détaillés dans [VALIDATION.md](VALIDATION.md).
+y compris l’historique des échecs corrigés, sont détaillés dans [VALIDATION.md](VALIDATION.md).
 L’accès de l’enseignant au dépôt privé reste à vérifier par le groupe.

@@ -17,7 +17,7 @@ from theme import apply_theme
 from ui import (TABLE_LABELS as TABLE_COLUMNS, category_legend, category_message, coverage_note, details, kpi_cards, median_card,
                 metric_message, number, numeric_summary, numeric_table, selection_table, share_card,
                 shares_summary, simple_comparison, short_median_card, short_share_card, show_table,
-                format_cards, reading_note, format_examples)
+                format_cards, reading_note, format_examples, format_missing_genres, existing_reading)
 
 st.set_page_config(page_title="Billboard #1", page_icon="🎵", layout="wide", initial_sidebar_state="expanded")
 apply_theme()
@@ -55,7 +55,7 @@ for key, value in defaults.items():
         st.session_state[key] = value
 
 NAV = {
-    "Vue d’ensemble": [("summary", "Synthèse")],
+    "Vue d’ensemble": [("summary", "Explorer les n°1")],
     "Format & son": [("format_trend", "Vue d’ensemble"), ("duration", "Durée & introduction"),
                      ("sound", "Signature sonore"), ("instrumentation", "Instrumentation"),
                      ("genres", "Genres musicaux")],
@@ -87,6 +87,14 @@ if st.session_state.route not in TITLES:
     st.session_state.route = "summary"
     st.session_state.pop("last_routes", None)
 
+FORMAT_ROUTES = ("format_trend", "duration", "sound", "instrumentation", "genres")
+is_format = st.session_state.route in FORMAT_ROUTES
+
+
+def format_words(text):
+    return (text.replace("PÉRIODES", "ANNÉES").replace("Périodes", "Années").replace("périodes", "années")
+            .replace("Période", "Année").replace("période", "année"))
+
 
 def navigate(route):
     route = LEGACY_FORMAT_ROUTES.get(route, route)
@@ -106,16 +114,22 @@ def open_group(group):
 def navigation(labels):
     active_group = next(group for group, entries in NAV.items() if st.session_state.route in dict(entries))
     st.session_state.setdefault("last_routes", {})[active_group] = st.session_state.route
-    with st.container(key="primary_nav", horizontal=True, gap="small"):
-        for index, group in enumerate(NAV):
-            st.button(group, key=f"group_{index}", on_click=open_group, args=(group,),
-                      type="primary" if group == active_group else "tertiary", width="content")
-    with st.container(key="secondary_nav", horizontal=True, gap="small"):
-        for route, title in NAV[active_group]:
-            if route in ("data_a", "data_b"):
-                title = labels["Période A" if route == "data_a" else "Référence B"]
-            st.button(title, key=f"nav_{route}", on_click=navigate, args=(route,), width="content",
-                      type="primary" if st.session_state.route == route else "tertiary")
+    def rows():
+        with st.container(key="primary_nav", horizontal=True, gap="small"):
+            for index, group in enumerate(NAV):
+                # Le nom interne de la rubrique reste stable pour les sessions ouvertes.
+                title = "Explorer les n°1" if group == "Vue d’ensemble" else group
+                st.button(title, key=f"group_{index}", on_click=open_group, args=(group,),
+                          type="primary" if group == active_group else "tertiary", width="content")
+        if len(NAV[active_group]) > 1:
+            with st.container(key="secondary_nav", horizontal=True, gap="small"):
+                for route, title in NAV[active_group]:
+                    if route in ("data_a", "data_b"):
+                        title = labels["Période A" if route == "data_a" else "Référence B"]
+                    st.button(title, key=f"nav_{route}", on_click=navigate, args=(route,), width="content",
+                              type="primary" if st.session_state.route == route else "tertiary")
+    with st.container(key="dashboard_navigation"):
+        rows()
 
 
 def journey(title, steps):
@@ -147,26 +161,26 @@ st.markdown('<div class="brand-banner"><span class="eq"><i></i><i></i><i></i><i>
 
 with st.sidebar:
     st.markdown('<div class="filter-heading">Filtres</div>', unsafe_allow_html=True)
-    st.subheader("PÉRIODES")
+    st.subheader("ANNÉES" if is_format else "PÉRIODES")
     mode = st.radio("Découpage", ["Décennies", "Intervalles d’années"], key="mode")
     if mode == "Décennies":
         options = [*decs, "recent"]
-        a = st.selectbox("Période étudiée", options, format_func=period_label, key="decade_a")
-        b = st.selectbox("Période de référence", options, format_func=period_label, key="decade_b")
+        a = st.selectbox("Année étudiée" if is_format else "Période étudiée", options, format_func=period_label, key="decade_a")
+        b = st.selectbox("Année de référence" if is_format else "Période de référence", options, format_func=period_label, key="decade_b")
         years_a = (2020, 2024) if a == "recent" else clamp(a)
         years_b = (2020, 2024) if b == "recent" else clamp(b)
     else:
-        years_a = st.slider("Période étudiée", first, last, key="years_a")
-        years_b = st.slider("Période de référence", first, last, key="years_b")
+        years_a = st.slider("Année étudiée" if is_format else "Période étudiée", first, last, key="years_a")
+        years_b = st.slider("Année de référence" if is_format else "Période de référence", first, last, key="years_b")
     # Effectifs remplis plus bas, une fois les périodes filtrées : visibles sur toutes les pages.
     counts_slot = st.empty()
     overlap = overlap_message(years_a, years_b)
     if overlap:
-        st.warning(overlap)
+        st.warning(format_words(overlap) if is_format else overlap)
     if any(y[0] <= 1958 <= y[1] for y in (years_a, years_b)):
         st.caption("1958 : à partir du 4 août seulement.")
     if any(y[0] <= 2025 <= y[1] for y in (years_a, years_b)):
-        st.warning("2025 : un seul titre, jusqu’au 11 janvier. Période partielle.")
+        st.warning("2025 : un seul titre, jusqu’au 11 janvier. " + ("Année partielle." if is_format else "Période partielle."))
     st.divider()
     st.subheader("GENRES")
     all_genres = sorted(set(all_data.genres.explode().dropna()))
@@ -174,7 +188,8 @@ with st.sidebar:
     if genre == "Non renseigné":
         st.caption("« Non renseigné » = absence de genre Discogs ; ce n’est pas un genre musical.")
     elif genre != "Tous les genres":
-        st.caption("Ce filtre exclut les titres sans genre Discogs. Même filtre pour les deux périodes et les courbes.")
+        text = "Ce filtre exclut les titres sans genre Discogs. Même filtre pour les deux périodes et les courbes."
+        st.caption(format_words(text) if is_format else text)
 
 frames = {"Période A": select(all_data, years_a, genre), "Référence B": select(all_data, years_b, genre)}
 for key, years in zip(frames, (years_a, years_b)):
@@ -188,9 +203,16 @@ counts_slot.markdown('<div class="period-counts">' + "".join(
     f'<div class="count-{suffix}"><span class="period-{suffix}">{labels[p]}</span><b>{len(d)}</b> titres</div>'
     for (p, d), suffix in zip(frames.items(), "ab")) + '</div>', unsafe_allow_html=True)
 st.title(TITLES[route])
+if is_format and genre != "Tous les genres":
+    st.caption("Genre Discogs : " + genre)
 for label, data in frames.items():
     if data.empty:
-        st.info(f"{labels[label]} : aucun titre pour cette sélection. Les résultats de l’autre période restent consultables.")
+        if is_format and all(d.empty for d in frames.values()):
+            if label == next(iter(frames)):
+                st.info("Aucun titre pour ces deux années et ce genre.")
+        else:
+            text = f"{labels[label]} : aucun titre pour cette sélection. Les résultats de l’autre période restent consultables."
+            st.info(format_words(text) if is_format else text)
     elif len(data) < 10:
         st.warning(f"{labels[label]} : {len(data)} titres seulement. Petits effectifs : prudence ; 10 titres n’est pas un seuil de fiabilité statistique.")
 if any(y[0] <= 2025 <= y[1] for y in (years_a, years_b)):
@@ -211,7 +233,6 @@ ORIGIN_CATEGORIES = [f"{label} : {text}" for label in list(ORIGINS.values())[:3]
 BASED = {"vocally_based": "Voix", "guitar_based": "Guitare", "piano_keyboard_based": "Piano / claviers", "bass_based": "Basse"}
 PRESENT = {"orchestral_strings": "Cordes orchestrales", "horns_winds": "Cuivres / vents"}
 BOX_NOTE = "La médiane partage les valeurs en deux moitiés. Q1–Q3 contient la moitié centrale des valeurs ; ce n’est pas un intervalle de confiance."
-TREND_NOTE = "Courbe : périodes indiquées sur l’axe. Cartes de comparaison : vos intervalles exacts, parfois différents des décennies. Même filtre de genre."
 PARTIAL_NOTE = "Cercles ouverts : couverture partielle. 1958 débute le 4 août ; 2025 s’arrête au 11 janvier. L’agrégat 2020–janv. 2025 diffère de la référence 2020–2024."
 filtered = select(all_data, (first, last), genre)
 
@@ -283,7 +304,6 @@ def detail_block(columns=None, notes=(), essentials=False):
 def trend_notes(data, captions=True):
     """Alertes de fiabilité toujours visibles ; notes de méthode optionnelles."""
     if captions:
-        st.caption(TREND_NOTE)
         st.caption(PARTIAL_NOTE)
     small = data[(data.valid > 0) & (data.valid < 10)]
     if len(small):
@@ -293,29 +313,27 @@ def trend_notes(data, captions=True):
         st.caption("Périodes sans valeur exploitable, non reliées : " + ", ".join(missing.label))
 
 
-def temporal_table(data):
+def temporal_table(data, for_format=False):
     keep = [c for c in ["label", "value", "q1", "q3", "count", "valid", "total", "partial"] if c in data]
-    st.dataframe(data[keep].rename(columns={"label": "Période couverte", "value": "Médiane / part (%)", "q1": "Q1", "q3": "Q3",
+    if for_format and "count" in data:
+        keep = [c for c in keep if c not in ("q1", "q3")]
+    st.dataframe(data[keep].rename(columns={"label": "Années couvertes" if for_format else "Période couverte", "value": "Médiane / part (%)", "q1": "Q1", "q3": "Q3",
                                           "count": "Titres concernés", "valid": "Exploitables", "total": "Titres", "partial": "Partielle"}), hide_index=True, width="stretch")
 
 
-FORMAT_HISTORY_NOTE = ("Historique : tous les titres du corpus filtré par genre, sur l’ensemble des décennies de 1958 à janvier 2025. "
-                       "Les cartes et distributions comparent uniquement les deux périodes sélectionnées.")
 INTRO_RATIO_NOTE = ("Part de l’introduction : 100 × intro_length_sec / length_sec, calculée pour chaque titre avec deux valeurs renseignées "
                     "et une durée totale strictement positive. La médiane porte sur ces ratios individuels, pas sur le ratio des médianes. "
                     "Une introduction de zéro seconde est une valeur connue ; une valeur manquante reste exclue.")
 FORMAT_BOX_NOTES = [BOX_NOTE, "Quartiles pandas par interpolation linéaire ; moustaches à 1,5 intervalle interquartile. "
                     "Toutes les valeurs exploitables contribuent aux calculs, même si les points extrêmes sont masqués.",
-                    FORMAT_HISTORY_NOTE, PARTIAL_NOTE]
+                    PARTIAL_NOTE]
 
 
 def format_history(metric, key):
     label, unit = FORMAT_METRICS[metric]
     data = decades(filtered, column=metric, coverage=(first, last))
-    st.caption(FORMAT_HISTORY_NOTE)
     render(trend(data, unit, years_a, years_b, y_title=f"{label} ({unit})"), key)
-    st.caption(PARTIAL_NOTE)
-    trend_notes(data, captions=False)
+    format_history_notes(data)
     return data
 
 
@@ -324,8 +342,34 @@ def format_data_links():
         shortcut("Explorer les titres · " + labels[period], target)
 
 
+def format_history_notes(data):
+    small = data[(data.valid > 0) & (data.valid < 10)]
+    if len(small):
+        st.warning("Moins de 10 valeurs : " + ", ".join(f"{r.label} ({r.valid}/{r.total})" for r in small.itertuples()))
+    missing = data[data.valid.eq(0)]
+    if len(missing):
+        st.caption("Années sans valeur exploitable : " + ", ".join(missing.label))
+
+
+def format_title(text):
+    st.markdown('<h2 class="format-chart-title">' + escape(text) + '</h2>', unsafe_allow_html=True)
+
+
+def format_selection():
+    st.caption(" · ".join(f"{labels[p]} : {len(d)} titres" for p, d in frames.items()))
+
+
+def format_comparison_table(data, order):
+    table = comparison_rows(data, frames, order).drop(columns="B − A (points)")
+    st.dataframe(display_comparison(table, frames), hide_index=True, width="stretch")
+
+
+FORMAT_METHOD = ["Boîte : moitié centrale Q1–Q3 ; losange : médiane ; moustaches : 1,5 intervalle interquartile. Q1–Q3 n’est pas un intervalle de confiance.",
+                 "Médianes sur les valeurs connues ; parts sur tous les titres filtrés. Début : 4 août 1958 ; fin : 11 janvier 2025."]
+
+
 if route == "summary":
-    # Parcours de chaque onglet en tête ; les anciens repères chiffrés restent en bas pour mémoire.
+    # L’accueil se limite aux trois parcours, avec leurs étapes originales.
     st.subheader("1 · Comment les caractéristiques musicales évoluent-elles ?")
     journey("Format & son · des repères à l’écoute", [
         ("Vue d’ensemble", "Quels repères ont évolué ?"),
@@ -344,67 +388,26 @@ if route == "summary":
         ("Équipes", "Combien de personnes l’ont écrit et produit ?"),
         ("Samples et reprises", "À partir de quoi est-il fait ?")])
 
-    st.divider()
-    st.subheader("Repères chiffrés (ancienne synthèse, gardée pour mémoire)")
-    kpi_cards([median_card(frames, "length_sec", "Durée médiane", is_duration=True),
-               median_card(frames, "intro_length_sec", "Introduction médiane", is_duration=True)], frames)
-    st.write("Trois lectures pour situer un projet artistique : caractéristiques musicales, origines, profils et création. Chaque titre compte une fois, à sa première semaine au n°1.")
-    st.caption("Observatoire descriptif des seuls n°1 : aucune recette du succès, prédiction ou norme de production. Fichier : 4 août 1958–11 janvier 2025.")
-    st.markdown("**1 · Caractéristiques musicales**")
-    st.write(metric_message(frames, "length_sec", "Durée", "s") + " " + metric_message(frames, "intro_length_sec", "Introduction", "s"))
-    left, right = st.columns(2)
-    with left:
-        shortcut("Explorer la durée et l’introduction", "duration")
-    with right:
-        shortcut("Ouvrir la vue d’ensemble de Format & son", "format_trend")
-    st.markdown("**2 · Origines**")
-    # ORIGINS : clés = valeurs brutes de origin_group, valeurs = libellés affichés.
-    us_only, non_us_only = list(ORIGINS)[0], list(ORIGINS)[2]
-    kpi_cards([share_card(frames, ORIGINS[us_only], lambda d: d.origin_group.eq(us_only), lambda d: d.origins.map(bool)),
-               share_card(frames, ORIGINS[non_us_only], lambda d: d.origin_group.eq(non_us_only), lambda d: d.origins.map(bool))], frames)
-    left, right = st.columns(2)
-    with left:
-        shortcut("Voir la composition et l’évolution", "origins")
-    with right:
-        shortcut("Comparer les pays et territoires", "map")
-    st.markdown("**3 · Profils et création**")
-    st.write(metric_message(frames, "writers_original", "Auteurs hors samples/interpolations", "personnes"))
-    kpi_cards([median_card(frames, "front_person_age", "Âge médian du frontperson", "ans"),
-               median_card(frames, "writers_original", "Auteurs hors samples/interpolations · médiane", "personnes")], frames)
-    left, right = st.columns(2)
-    with left:
-        shortcut("Voir la dispersion des âges", "ages")
-    with right:
-        shortcut("Voir les équipes de création", "teams")
-    with detail_block(notes=[AGE_NOTE, CREDIT_NOTE, ORIGIN_NOTE]):
-        pass
-
 elif route == "format_trend":
     essentials = ["length_sec", "intro_length_sec", "bpm", "danceability"]
     format_cards(frames, essentials)
-    st.subheader("Évolution historique")
-    metric = st.selectbox("Caractéristique à explorer", list(FORMAT_METRICS),
+    metric = st.selectbox("Mesure", list(FORMAT_METRICS),
                           format_func=lambda c: FORMAT_METRICS[c][0], key="evolution_metric")
     label, unit = FORMAT_METRICS[metric]
+    format_title(label + " · évolution")
     data = format_history(metric, "format_overview_history")
-    reading_note(BOX_NOTE + " La courbe décrit des décennies, les cartes vos deux sélections. Ces repères servent à situer un projet artistique, sans prédire son succès.")
-    st.subheader("Poursuivre l’exploration")
-    for row in [[("duration", "Durée & introduction", "Comparer la longueur des morceaux et la place de leur introduction."),
-                 ("sound", "Signature sonore", "Explorer tempo, énergie, dansabilité, acoustique et niveau sonore.")],
-                [("instrumentation", "Instrumentation", "Distinguer ce qui structure le morceau de ce qui enrichit l’arrangement."),
-                 ("genres", "Genres musicaux", "Comparer les genres Discogs et suivre leur présence au fil des décennies.")]]:
-        for slot, (target, title, description) in zip(st.columns(2), row):
-            with slot:
-                shortcut(title, target)
-                st.caption(description)
-    with detail_block({c: FORMAT_METRICS[c][0] for c in dict.fromkeys(essentials + [metric])},
-                      FORMAT_BOX_NOTES + [INTRO_RATIO_NOTE]):
-        st.markdown("**Mesure sélectionnée · " + label + "**")
-        numeric_table(frames, metric, unit)
-        temporal_table(data)
+    reading_note("Courbe : médiane par décennie ; bande : moitié centrale Q1–Q3. Les cartes comparent les années choisies.")
+    with detail_block(notes=FORMAT_METHOD + [format_words(PARTIAL_NOTE)], essentials=True):
+        numeric_table(frames, metric, unit, period_column="Année")
+        temporal_table(data, for_format=True)
         if metric in SOUND_HELP:
-            st.write(SOUND_HELP[metric])
+            st.caption(SOUND_HELP[metric])
+        if metric == "intro_ratio":
+            st.caption(INTRO_RATIO_NOTE)
         format_examples(frames, metric)
+        # Raccourcis conservés dans le volet, la navigation reste accessible au-dessus.
+        for target, title in NAV["Format & son"][1:]:
+            shortcut(title, target)
         format_data_links()
 
 elif route in ("ages", "teams"):
@@ -443,7 +446,7 @@ elif route in ("ages", "teams"):
             median = f"la moitié des n°1 comptent {number(values.median())} {who} ou moins, l’autre moitié {number(values.median())} ou plus"
         if not len(values):
             example, median = "", "la valeur du milieu"
-        st.markdown(f"""
+        existing_reading(f"""
 **Comment lire la boîte** · une boîte par période.
 - **Le trait au milieu de la boîte** : la médiane ; en {labels['Référence B']}, {median}. Le losange rappelle la même valeur.
 - **La boîte** : la moitié des n°1, ceux du milieu (Q1–Q3). {example}
@@ -451,7 +454,7 @@ elif route in ("ages", "teams"):
 - **Les points isolés** : les cas extrêmes, très au-dessus ou très en dessous des autres.{" Ceux qui sortent du cadre sont listés en haut, après ▲." if route == "ages" else ""}
 
 Une boîte plus haute indique des valeurs plus élevées ; une boîte plus étirée, des n°1 plus différents entre eux.
-""")
+""", key=route)
     with detail_block({metric: label}, notes, essentials=True):
         numeric_table(frames, metric, unit)
         if view == "Évolution par décennie":
@@ -472,13 +475,13 @@ elif route in ("formats", "reuse"):
         data = share_frame(frames, "credit_type")
         category_legend(order, large=True)
         render(stacked(frames, "credit_type", order, vertical=True), route, height=580)
-        st.markdown("""
+        existing_reading("""
 **Comment lire les 4 cases** · chaque n°1 est rangé dans une seule case.
 - **Solo** : un seul artiste au crédit, sans invité. *Ex. : Taylor Swift, Harry Styles.*
 - **Duo ou groupe constitué** : un groupe ou un duo qui existe en tant que tel, avec un nom et une carrière commune. *Ex. : Maroon 5, Coldplay, Silk Sonic (Bruno Mars et Anderson .Paak réunis sous un seul nom).*
 - **Featuring** : un artiste principal invite un autre artiste sur son titre ; le crédit contient « feat. ». *Ex. : Rihanna feat. Drake.*
 - **Co-signature** : deux artistes ou plus, chacun avec sa propre carrière, signent le titre à égalité ; le crédit contient « & ». *Ex. : Ariana Grande & Justin Bieber.*
-""")
+""", key=route)
         notes = []
     else:
         columns = REUSE
@@ -493,8 +496,8 @@ elif route in ("formats", "reuse"):
             kpi_cards([(f"{label} · quasi absente des n°1",
                         [f"{int(r.effectif)} titre{'s' if r.effectif > 1 else ''} ({number(r.part)} %)" for r in counts.itertuples()],
                         None)], frames, compact=True, tone="alert")
-        st.markdown("**Comment lire les flèches** · vers la droite, la pratique progresse ; vers la gauche, elle recule. "
-                    "Plus la flèche est longue, plus l’écart entre les deux périodes est grand.")
+        existing_reading("**Comment lire les flèches** · vers la droite, la pratique progresse ; vers la gauche, elle recule. "
+                    "Plus la flèche est longue, plus l’écart entre les deux périodes est grand.", key=route)
         st.markdown("""
 **Les 3 pratiques** · un même titre peut en cumuler plusieurs, le total ne fait donc pas 100 %.
 - **Sample** : un extrait d’un enregistrement existant est repris tel quel dans le morceau. *Ex. : Not Like Us, Kendrick Lamar.*
@@ -507,114 +510,97 @@ elif route in ("formats", "reuse"):
 
 elif route == "duration":
     format_cards(frames, ["length_sec", "intro_length_sec", "intro_ratio"])
-    st.write(metric_message(frames, "length_sec", "Durée totale", "s") + " "
-             + metric_message(frames, "intro_length_sec", "Introduction", "s"))
-    st.caption("Un écart entre médianes ne signifie pas que tous les titres évoluent dans le même sens.")
-    st.subheader("Durée totale · comparaison des distributions")
-    render(distribution(frames, "length_sec", "s", points=False), "format_duration_distribution")
-    st.subheader("Introduction · comparaison des distributions")
-    render(distribution(frames, "intro_length_sec", "s", points=False), "format_intro_distribution")
-    st.subheader("Évolution historique")
-    metric = st.selectbox("Mesure à suivre", ["length_sec", "intro_length_sec", "intro_ratio"],
-                          format_func=lambda c: FORMAT_METRICS[c][0], key="duration_metric")
-    data = format_history(metric, "format_duration_history")
-    reading_note(BOX_NOTE + " Les deux distributions ont des échelles distinctes, en secondes. "
-                 "La part de l’introduction rapporte son temps à celui du morceau, titre par titre ; sa médiane s’exprime en %.")
-    with detail_block({c: FORMAT_METRICS[c][0] for c in ["length_sec", "intro_length_sec", "intro_ratio"]},
-                      FORMAT_BOX_NOTES + [INTRO_RATIO_NOTE, "L’introduction peut inclure un hook initial ; sa durée ne mesure pas nécessairement l’attente avant la voix."]):
-        for column in ["length_sec", "intro_length_sec", "intro_ratio"]:
-            st.markdown("**" + FORMAT_METRICS[column][0] + "**")
-            numeric_table(frames, column, FORMAT_METRICS[column][1])
-        temporal_table(data)
+    view = st.radio("Graphique", ["Durée", "Introduction", "Évolution"], horizontal=True, key="duration_view")
+    data = None
+    if view == "Évolution":
+        metric = st.selectbox("Mesure à suivre", ["length_sec", "intro_length_sec", "intro_ratio"],
+                              format_func=lambda c: FORMAT_METRICS[c][0], key="duration_metric")
+        format_title(FORMAT_METRICS[metric][0] + " · évolution")
+        data = format_history(metric, "format_duration_history")
+        reading_note("Médiane par décennie ; bande Q1–Q3. Le ratio d’introduction est calculé titre par titre.")
+    else:
+        metric = "length_sec" if view == "Durée" else "intro_length_sec"
+        format_title(FORMAT_METRICS[metric][0] + " · distribution")
+        render(distribution(frames, metric, "s", points=False), "format_duration_distribution")
+        reading_note("Losange : médiane ; boîte : moitié centrale Q1–Q3. Axe en secondes, propre à la mesure choisie.")
+    with detail_block(notes=FORMAT_METHOD + ["Ratio par titre : 100 × introduction / durée, avec durée > 0 et deux valeurs connues. Un zéro est conservé ; un manque est exclu.",
+                      "L’introduction peut inclure un hook ; elle ne mesure pas nécessairement l’attente avant la voix.", format_words(PARTIAL_NOTE)], essentials=True):
+        numeric_table(frames, metric, FORMAT_METRICS[metric][1], period_column="Année")
+        if data is not None:
+            temporal_table(data, for_format=True)
         format_examples(frames, metric)
         format_data_links()
 
 elif route == "sound":
-    metric = st.selectbox("Caractéristique sonore", list(SOUND_HELP),
-                          format_func=lambda c: METRICS[c][0], key="sonic")
+    metric = st.selectbox("Mesure", list(SOUND_HELP), format_func=lambda c: METRICS[c][0], key="sonic",
+                          help=SOUND_HELP[st.session_state.get("sonic", "bpm")])
     label, unit = METRICS[metric]
     format_cards(frames, [metric])
-    st.write(metric_message(frames, metric, label, unit))
-    st.subheader("Distribution · comparaison des périodes")
-    render(distribution(frames, metric, unit), "format_sound_distribution")
-    st.subheader("Évolution historique")
-    data = format_history(metric, "format_sound_history")
-    reading_note(SOUND_HELP[metric] + " " + BOX_NOTE)
-    with detail_block({metric: label}, FORMAT_BOX_NOTES + [SOUND_HELP[metric],
-                      "Énergie, dansabilité et caractère acoustique : scores Spotify sur 100 dans le fichier. BPM et dB conservent leur propre échelle."]):
-        numeric_table(frames, metric, unit)
-        temporal_table(data)
+    view = st.radio("Graphique", ["Distribution", "Évolution"], horizontal=True, key="sound_view")
+    format_title(label + (" · distribution" if view == "Distribution" else " · évolution"))
+    data = None
+    if view == "Distribution":
+        render(distribution(frames, metric, unit), "format_sound_distribution")
+        reading_note("Losange : médiane ; boîte : moitié centrale Q1–Q3 ; points isolés : valeurs extrêmes.")
+    else:
+        data = format_history(metric, "format_sound_history")
+        reading_note("Médiane par décennie ; bande Q1–Q3.")
+    with detail_block(notes=[SOUND_HELP[metric], *FORMAT_METHOD, format_words(PARTIAL_NOTE)], essentials=True):
+        numeric_table(frames, metric, unit, period_column="Année")
+        if data is not None:
+            temporal_table(data, for_format=True)
         format_examples(frames, metric)
         format_data_links()
 
 elif route == "instrumentation":
-    st.caption("Un rôle central décrit ce qui porte le morceau. Une présence décrit une couleur de l’arrangement, sans présumer un rôle central.")
-    results = []
-    for title, columns, key in [("Ce qui structure le morceau", BASED, "format_central_bars"),
-                                ("Ce qui est présent dans l’arrangement", PRESENT, "format_presence_bars")]:
-        st.subheader(title)
-        data, order = binary_frame(frames, columns), list(columns.values())
-        st.write(category_message(data, frames, order))
-        render(format_bars(data, frames, order), key)
-        shares_summary(data, frames, order)
-        for period, frame in frames.items():
-            small = [f"{label} ({frame[c].count()})" for c, label in columns.items() if 0 < frame[c].count() < 10]
-            if small:
-                st.warning(labels[period] + " · moins de 10 valeurs renseignées : " + ", ".join(small) + ". Prudence.")
-        results.append((title, data, order))
-    reading_note("Ces indicateurs sont cumulables : un titre peut avoir une voix et une basse centrales, avec des cordes présentes. "
-                 "Les parts ne forment pas une répartition à 100 %. Chaque barre rapporte les titres concernés à tous les titres filtrés de sa période ; "
-                 "le survol précise les effectifs et l’écart en points (référence − étudiée).")
-    with detail_block({**BASED, **PRESENT}, ["Sources binaires : 1 = oui, 0 = non ; vide = inconnu. Un indicateur entièrement manquant est indisponible, pas nul.",
-                      "Les valeurs inconnues restent dans le dénominateur ; les taux ne portent donc pas uniquement sur les titres renseignés.",
-                      "Rôle central et présence ne mesurent ni la complexité ni la qualité musicale."]):
-        for title, data, order in results:
-            st.markdown("**" + title + "**")
-            simple_comparison(data, frames, order, "Instrument / section")
+    view = st.radio("Analyse", ["Rôle central", "Présence"], horizontal=True, key="instrument_view")
+    columns = BASED if view == "Rôle central" else PRESENT
+    title = "Ce qui structure le morceau" if view == "Rôle central" else "Ce qui est présent dans l’arrangement"
+    format_title(title)
+    format_selection()
+    data, order = binary_frame(frames, columns), list(columns.values())
+    render(format_bars(data, frames, order), "format_instrument_bars")
+    for period, frame in frames.items():
+        small = [f"{label} ({frame[c].count()})" for c, label in columns.items() if 0 < frame[c].count() < 10]
+        if small:
+            st.warning(labels[period] + " · moins de 10 valeurs renseignées : " + ", ".join(small) + ". Prudence.")
+    reading_note("Central : porte le morceau ; présent : enrichit l’arrangement. Parts cumulables, sur tous les titres ; elles peuvent dépasser 100 %.")
+    with detail_block(notes=["1 = oui ; 0 = non ; vide = inconnu. Tous les titres filtrés restent au dénominateur. Un indicateur entièrement inconnu est indisponible.",
+                      "Rôle central et présence ne mesurent ni la complexité ni la qualité musicale."], essentials=True):
+        format_comparison_table(data, order)
         format_data_links()
 
 elif route == "genres":
-    view = st.radio("Lecture des genres", ["Comparaison des périodes", "Évolution historique"],
+    view = st.radio("Graphique", ["Comparaison des périodes", "Évolution historique"],
+                    format_func=lambda v: "Comparer les années" if v == "Comparaison des périodes" else "Historique",
                     horizontal=True, key="genres_view")
-    st.caption("Plusieurs genres Discogs peuvent être associés à un titre : additionner leurs parts peut dépasser 100 %. Aucune autre source ne complète les genres manquants.")
-    coverage_note(frames, column="discogs_genre", label="Couverture Discogs des deux sélections")
     data = genre_frame(frames)
     order = ranked_categories(data[data["catégorie"].ne("Non renseigné")], missing=None)
     temporal = None
     if view == "Comparaison des périodes":
-        st.subheader("Genres les plus représentés")
-        st.caption("Top 9 selon la moyenne des parts des périodes disponibles, avec le même poids pour chaque période.")
+        format_title("Genres les plus représentés")
+        format_selection()
         if order:
-            st.write(category_message(data, frames, order))
             render(format_bars(data, frames, order), "format_genres_bars")
-            shares_summary(data, frames, order)
         else:
-            st.info("Aucun genre musical renseigné dans les deux périodes sélectionnées.")
-        st.subheader("À part · genres non renseignés")
-        kpi_cards([share_card(frames, "Non renseigné", lambda d: d.genres.map(lambda g: g == ["Non renseigné"]))], frames, tone="format-cards")
-        reading_note("Chaque barre indique la part de tous les titres de la période associés au genre. "
-                     "Le survol donne les effectifs et l’écart en points (référence − étudiée). Les titres sans genre figurent séparément et restent au dénominateur.")
+            st.info("Aucun genre musical renseigné dans les deux années sélectionnées.")
+        format_missing_genres(frames)
+        reading_note("Top 9 à poids égal entre les deux sélections. Genres cumulables ; titres sans genre affichés à part et conservés au dénominateur.")
     else:
-        selected_genre = st.selectbox("Genre à suivre dans le temps", all_genres, key="genre_history")
+        selected_genre = st.selectbox("Genre à suivre", all_genres, key="genre_history")
+        format_title(selected_genre + " · évolution")
         temporal = decades(filtered, genre=selected_genre, coverage=(first, last))
-        st.caption(FORMAT_HISTORY_NOTE)
         render(genre_trend(temporal, selected_genre, years_a, years_b), "format_genres_history")
-        st.caption(PARTIAL_NOTE)
-        trend_notes(temporal, captions=False)
-        if genre != "Tous les genres":
-            st.caption("Filtre global actif : « " + genre + " ». La courbe décrit les co-genres de ces titres ; suivre le genre filtré lui-même donne 100 % dans chaque décennie renseignée.")
-        reading_note("Chaque point rapporte les titres associés au genre choisi à tous les titres filtrés de la décennie. "
-                     "Le survol donne le nombre de titres concernés et le dénominateur. Cercles ouverts : périodes partielles. "
-                     "Une décennie sans genre exploitable est laissée sans point ; « Non renseigné » suit les absences de genre, sans en inventer.")
-    with detail_block({"discogs_genre": "Genre Discogs"}, [
-            "Genres multiples séparés par point-virgule, nettoyés et dédupliqués par titre. Seul discogs_genre est utilisé ; jamais cdr_genre.",
-            "Classement équilibré entre périodes disponibles, égalités alphabétiques. Une catégorie absente d’une période renseignée vaut zéro ; une période vide est indisponible.",
-            "Pour un genre musical, une période ou décennie dont tous les genres manquent est indisponible. La part de « Non renseigné » reste calculable sur tous les titres.",
-            FORMAT_HISTORY_NOTE, PARTIAL_NOTE]):
+        format_history_notes(temporal)
+        reading_note("Part des titres associés au genre choisi, par décennie. Un filtre global suit ses co-genres ; le genre filtré lui-même vaut 100 % s’il est renseigné.")
+    with detail_block(notes=["Discogs seul ; genres multiples dédupliqués par titre. Top 9 : moyenne des parts disponibles, poids égaux, égalités alphabétiques.",
+            "Absence connue = zéro ; sélection vide ou genre musical entièrement inconnu = indisponible. Non renseigné reste calculable sur tous les titres.",
+            format_words(PARTIAL_NOTE)], essentials=True):
+        coverage_note(frames, column="discogs_genre", label="Couverture Discogs")
         if temporal is not None:
-            temporal_table(temporal)
+            temporal_table(temporal, for_format=True)
         else:
-            simple_comparison(data, frames, sorted(data["catégorie"].unique()) or ["Non renseigné"], "Genre Discogs")
+            format_comparison_table(data, sorted(data["catégorie"].unique()) or ["Non renseigné"])
         format_data_links()
 
 elif route == "origins":
@@ -630,12 +616,12 @@ elif route == "origins":
         series = [(ORIGINS[key], decades(filtered, origin=key, coverage=(first, last)))
                   for key in list(ORIGINS)[:3]]
         render(origins_trend(series), "origin_trend", height=480)
-        st.markdown("""
+        existing_reading("""
 **Comment lire** · une courbe par catégorie, chaque titre comptant dans une seule d'entre elles.
 - **Les cercles ouverts** signalent une période incomplète.
 - **Une courbe interrompue** signale une période sans origine exploitable.
 - Ce qui compte n'est pas le niveau d'une courbe, mais **l'écart entre les trois**.
-""")
+""", key=route)
         # Une seule alerte, sur la borne basse des trois parts, appariée par libellé de période.
         by_period = pd.concat([d.set_index("label").valid for _, d in series], axis=1).min(axis=1)
         coverage = series[0][1].assign(valid=series[0][1].label.map(by_period)).dropna(subset=["valid"])
@@ -645,13 +631,13 @@ elif route == "origins":
         data["catégorie"] = data["catégorie"].replace(ORIGINS)
         # Même hauteur que la courbe ; 480 px laissent son étiquette au segment à 5 %.
         render(stacked(frames, column, order, vertical=True), "origins", height=480)
-        st.markdown("**Comment lire les barres** · une barre par période, représentant tous ses titres "
+        existing_reading("**Comment lire les barres** · une barre par période, représentant tous ses titres "
                     "dont l’origine est renseignée. Les trois catégories sont exclusives : chaque titre "
                     "figure dans une seule, et les trois parts couvrent donc l’ensemble. Leur définition "
-                    "exacte est dans la légende au-dessus, et dans Détails.")
+                    "exacte est dans la légende au-dessus, et dans Détails.", key=route)
     if any(d.origins.map(bool).sum() < len(d) for d in frames.values()):
         coverage_note(frames, list_column="origins", label="Origines exploitables")
-    with detail_block(notes=[ORIGIN_NOTE] + ([TREND_NOTE] if view == "Évolution" else ORIGIN_CATEGORIES),
+    with detail_block(notes=[ORIGIN_NOTE] + ([] if view == "Évolution" else ORIGIN_CATEGORIES),
                       essentials=True):
         if view == "Évolution":
             for label, data in series:
@@ -683,9 +669,9 @@ elif route == "map":
         shares_summary(comparisons, frames, [country])
     else:
         render(bars(comparisons, frames, order), route)
-        st.markdown("**Comment lire les barres** · les dix pays les plus représentés, classés sur la "
+        existing_reading("**Comment lire les barres** · les dix pays les plus représentés, classés sur la "
                     "moyenne des deux périodes à poids égaux. Un titre peut être associé à plusieurs "
-                    "pays : le total dépasse donc 100 %.")
+                    "pays : le total dépasse donc 100 %.", key=route)
     with detail_block(notes=[ORIGIN_NOTE,
                         "Un titre peut être associé à plusieurs pays : le total dépasse 100 %. Un pays documenté mais absent de la sélection vaut zéro.",
                         "« Unites States » est normalisé en United States. « Columbia » est normalisé en Colombia sur le titre We Don't Talk About Bruno : correction étayée par les biographies Disney du casting, sans vérification exhaustive de chaque origine du casting."],

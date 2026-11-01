@@ -2,6 +2,7 @@
 import hashlib
 import io
 import json
+import re
 from pathlib import Path
 import unittest
 from html.parser import HTMLParser
@@ -97,7 +98,8 @@ def go_to(app, route, *, origins_view=None):
     ]
     group = next(i for i, routes in enumerate(groups) if route in routes)
     app.button(key=f'group_{group}').click().run()
-    app.button(key='nav_' + route).click().run()
+    if route != 'summary':
+        app.button(key='nav_' + route).click().run()
     if route == 'origins' and origins_view is not None:
         app.radio(key='origins_view').set_value(origins_view).run()
 
@@ -129,12 +131,13 @@ class DashboardJourneys(unittest.TestCase):
         self.assertEqual(self.app.radio(key='mode').value, 'Décennies')
         self.assertEqual(self.app.selectbox(key='decade_a').value, 2000)
         self.assertEqual(self.app.selectbox(key='decade_b').value, 'recent')
-        self.assertIn('129 titres', ' '.join(m.value for m in self.app.markdown))
-        self.assertIn('81 titres', ' '.join(m.value for m in self.app.markdown))
+        counts = re.sub(r'<[^>]+>', '', ' '.join(m.value for m in self.app.sidebar.markdown))
+        self.assertIn('129 titres', counts)
+        self.assertIn('81 titres', counts)
         for route, view in ROUTE_CASES:
             with self.subTest(route=route, view=view):
                 self.go(route, origins_view=view)
-                expected_charts = {'duration': 3, 'sound': 2, 'instrumentation': 2}.get(route, 1)
+                expected_charts = 1
                 self.assertEqual(len(self.app.get('plotly_chart')), expected_charts)
                 self.assertFalse(self.app.get('download_button'))  # Export regroupé dans Données.
                 detail = [e for e in self.app.expander if e.label == 'Détails']
@@ -150,6 +153,13 @@ class DashboardJourneys(unittest.TestCase):
         self.app.selectbox(key='decade_a').set_value(1980).run()
         for route in ['duration', 'format_trend', 'origins', 'map', 'ages', 'teams']:
             self.go('summary')
+            self.go(route)  # Accès par la navigation : les repères après la partie 3 sont retirés.
+            self.clean()
+            self.assertEqual(self.app.session_state['route'], route)
+            self.assertEqual(self.app.selectbox(key='genre').value, 'Pop')
+            self.assertEqual(self.app.selectbox(key='decade_a').value, 1980)
+        for route in ['duration', 'sound', 'instrumentation', 'genres', 'data_a', 'data_b']:
+            self.go('format_trend')
             self.app.button(key='shortcut_' + route).click().run()
             self.clean()
             self.assertEqual(self.app.session_state['route'], route)

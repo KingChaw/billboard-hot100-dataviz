@@ -1,5 +1,6 @@
 """Une figure par analyse ; valeurs, unités et conventions A/B communes."""
 import textwrap
+import re
 from pathlib import Path
 
 import numpy as np
@@ -64,14 +65,27 @@ def render(fig, key, height=None):
             fig.update_layout(margin_b=65)
         if key.startswith("format_"):
             if key.endswith("history"):
-                fig.update_xaxes(tickangle=-55 if viewport["width"] < 400 else -35, title=None)
+                ticks = []
+                for i, label in enumerate(fig.layout.xaxis.ticktext):
+                    years = re.findall(r"\d{4}", label)
+                    partial = years[0] == "1958" or years[-1] == "2025"
+                    ticks.append(("<br><br>" if i % 2 else "") + years[0] + "<br>–" + years[-1][2:] + ("*" if partial else ""))
+                fig.update_xaxes(ticktext=ticks, tickangle=0, title=None, tickfont_size=10)
                 fig.update_layout(margin_b=85)
                 fig.update_layout(legend=dict(y=1.02, font_size=10))
             if fig.layout.barmode == "group":
                 fig.update_yaxes(ticktext=["<br>".join(textwrap.wrap(label, width=14, break_long_words=False))
                                           for label in fig.layout.yaxis.categoryarray])
-                fig.update_traces(texttemplate="%{x:.0f} %", selector=dict(type="bar"))
-                fig.update_layout(margin_t=90)
+                fig.update_traces(texttemplate="%{x:.0f} %<br>%{customdata[3]}", textfont_size=10, selector=dict(type="bar"))
+                fig.update_layout(margin_t=90, margin_r=45)
+    if key.startswith("format_"):
+        # Vocabulaire de présentation seulement ; positions et données inchangées.
+        for trace in fig.data:
+            if trace.name == "Zone où se trouve la moitié des n°1 (Q1–Q3)":
+                trace.name = "Moitié centrale (Q1–Q3)"
+        for axis in (fig.layout.xaxis, fig.layout.yaxis):
+            if axis.title.text:
+                axis.title.text = axis.title.text.replace("Périodes", "Années").replace("Période", "Année")
     st.plotly_chart(fig, key=f"chart_{key}", use_container_width=True, theme=None,
                     config={"displayModeBar": False, "responsive": True, "scrollZoom": False,
                             "topojsonURL": "app/static/"})
@@ -225,21 +239,17 @@ def bars(data, frames, order):
 
 
 def format_bars(data, frames, order):
-    """Comparaison instrument/genre : parts, effectifs et écarts au même survol."""
-    from dashboard_data import comparison_rows
+    """Comparaison Format & son : parts et effectifs, sans écarts affichés."""
     aligned = aligned_shares(data, frames, order)
-    comparison = comparison_rows(data, frames, order).set_index("Indicateur")
     fig = bars(data, frames, order)
     for trace, period in zip(fig.data, PERIODS):
         d = aligned[aligned["période"].eq(period)].copy()
-        d["delta"] = d["catégorie"].map(comparison["B − A (points)"])
-        d["delta_label"] = d.delta.map(lambda v: (f"{v:+.1f}".replace(".", ",") + " points") if pd.notna(v) else "Non disponible")
-        trace.customdata = d[["effectif", "total", "renseignés", "delta_label"]]
-        trace.texttemplate = "%{x:.1f} % · n=%{customdata[0]}"
+        d["effectif_affiché"] = d.effectif.map(lambda n: f"{int(n)} titre{'s' if n != 1 else ''}")
+        trace.customdata = d[["effectif", "total", "renseignés", "effectif_affiché"]]
+        trace.texttemplate = "%{x:.1f} % · %{customdata[3]}"
         trace.hovertemplate = (period_labels(frames)[period] + " · %{y}<br>%{x:.1f} %"
                                + "<br>%{customdata[0]:.0f} / %{customdata[1]} titres"
-                               + "<br>%{customdata[2]} renseignés<br>Écart : %{customdata[3]} ("
-                               + difference_label(frames) + ")<extra></extra>")
+                               + "<br>%{customdata[2]} renseignés<extra></extra>")
     fig.update_xaxes(range=[0, 140])
     return fig
 

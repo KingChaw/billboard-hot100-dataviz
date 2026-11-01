@@ -106,7 +106,8 @@ class FormatStatistics(unittest.TestCase):
         fig = format_bars(data, frames, ['Guitare', 'Basse'])
         self.assertEqual(len(fig.data), 2)
         self.assertEqual(fig.data[0].customdata[0][0], 2)
-        self.assertIn('Écart', fig.data[0].hovertemplate)
+        self.assertNotIn('Écart', fig.data[0].hovertemplate)
+        self.assertNotIn('n=', fig.data[0].texttemplate)
         a['guitar_based'] = float('nan')
         unavailable = comparison_rows(binary_frame(frames, columns), frames, ['Guitare'])
         self.assertTrue(pd.isna(unavailable.iloc[0]['A (%)']))
@@ -141,11 +142,11 @@ class FormatJourneys(unittest.TestCase):
         self.clean()
 
     def history_table(self):
-        return next(t.value for t in self.app.dataframe if 'Période couverte' in t.value)
+        return next(t.value for t in self.app.dataframe if 'Années couvertes' in t.value)
 
     def test_five_pages_order_questions_details_reading_and_charts(self):
         expected = ['Vue d’ensemble', 'Durée & introduction', 'Signature sonore', 'Instrumentation', 'Genres musicaux']
-        for route, count in zip(FORMAT_ROUTES, [1, 3, 2, 2, 1]):
+        for route, count in zip(FORMAT_ROUTES, [1, 1, 1, 1, 1]):
             self.go(route)
             self.assertEqual([b.label for b in self.app.button if b.key.startswith('nav_')], expected)
             self.assertTrue(self.app.title[0].value.endswith('?'))
@@ -172,7 +173,7 @@ class FormatJourneys(unittest.TestCase):
     def test_summary_overview_exploration_and_data_shortcuts_preserve_filters(self):
         self.app.selectbox(key='genre').set_value('Pop').run()
         self.app.selectbox(key='decade_a').set_value(1980).run()
-        self.app.button(key='shortcut_format_trend').click().run()
+        self.app.button(key='group_1').click().run()
         self.assertEqual(self.app.session_state['route'], 'format_trend')
         for target in FORMAT_ROUTES[1:]:
             self.go('format_trend')
@@ -193,6 +194,8 @@ class FormatJourneys(unittest.TestCase):
                                     ('duration', 'duration_metric', ['length_sec', 'intro_length_sec', 'intro_ratio']),
                                     ('sound', 'sonic', SOUND_HELP)]:
             self.go(route)
+            if route == 'duration':
+                self.app.radio(key='duration_view').set_value('Évolution').run()
             for value in options:
                 self.app.selectbox(key=key).set_value(value).run()
                 self.clean()
@@ -210,15 +213,18 @@ class FormatJourneys(unittest.TestCase):
 
     def test_period_filters_change_comparison_but_not_history(self):
         self.go('duration')
+        self.app.radio(key='duration_view').set_value('Évolution').run()
         before = self.history_table().copy()
         self.app.radio(key='mode').set_value('Intervalles d’années').run()
         self.app.slider(key='years_a').set_value((1984, 1992)).run()
         self.app.slider(key='years_b').set_value((2020, 2020)).run()
         pd.testing.assert_frame_equal(before, self.history_table())
+        self.app.radio(key='duration_view').set_value('Durée').run()
         spec = json.loads(self.app.get('plotly_chart')[0].proto.spec)
         boxes = [t for t in spec['data'] if t['type'] == 'box']
         for box, years in zip(boxes, [(1984, 1992), (2020, 2020)]):
             self.assertEqual(box['median'][0], select(prepare(), years).length_sec.median())
+        self.app.radio(key='duration_view').set_value('Évolution').run()
         self.app.selectbox(key='genre').set_value('Pop').run()
         expected = decades(select(prepare(), (1958, 2025), 'Pop'), column='length_sec', coverage=(1958, 2025))
         pd.testing.assert_series_equal(self.history_table()['Médiane / part (%)'], expected.value, check_names=False)
@@ -241,9 +247,12 @@ class FormatJourneys(unittest.TestCase):
     def test_empty_identical_partial_periods_and_dynamic_comment(self):
         self.app.selectbox(key='decade_a').set_value(2010).run()
         self.go('duration')
-        self.assertIn('10 à 11 s', ' '.join(m.value for m in self.app.markdown))
+        text = ' '.join(m.value for m in self.app.markdown)
+        self.assertIn('10 s', text)
+        self.assertIn('11 s', text)
+        self.assertNotIn('Écart', text)
         self.app.selectbox(key='decade_a').set_value('recent').run()
-        self.assertIn('médianes identiques', ' '.join(m.value for m in self.app.markdown))
+        self.assertEqual(' '.join(m.value for m in self.app.markdown).count('>11 s<'), 2)
         self.app.radio(key='mode').set_value('Intervalles d’années').run()
         self.app.slider(key='years_a').set_value((1958, 1959)).run()
         self.app.selectbox(key='genre').set_value('Non renseigné').run()
@@ -272,8 +281,10 @@ class FormatJourneys(unittest.TestCase):
                 self.app = AppTest.from_file(str(ROOT / 'app.py')).run(timeout=30)
                 for route in FORMAT_ROUTES[:-1]:
                     self.go(route)
-                    self.assertIn('Non disponible', ' '.join(m.value for m in self.app.markdown)
-                                  + ' '.join(str(t.value) for t in self.app.dataframe))
+                    visible = (' '.join(m.value for m in self.app.markdown)
+                               + ' '.join(str(t.value) for t in self.app.dataframe)
+                               + ' '.join(c.proto.spec for c in self.app.get('plotly_chart')))
+                    self.assertIn('non disponible', visible.lower())
         finally:
             st.cache_data.clear()
 
